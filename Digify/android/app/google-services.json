@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "181945947317",
+    "project_id": "digify-8c92d",
+    "storage_bucket": "digify-8c92d.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:181945947317:android:5ccb5e292565a1262ddafc",
+        "android_client_info": {
+          "package_name": "com.example.digify"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBHFo56skqQlx2bON19dwu36vGpLiJYHvY"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
