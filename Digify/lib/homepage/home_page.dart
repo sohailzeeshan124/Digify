@@ -1,6 +1,6 @@
 import 'package:digify/homepage/pagesinside/archieve_page.dart';
 import 'package:digify/homepage/pagesinside/chats/chats_page.dart';
-import 'package:digify/homepage/pagesinside/create_pdfpage.dart';
+import 'package:digify/homepage/pagesinside/creation/create_page.dart';
 import 'package:digify/homepage/pagesinside/profile_page.dart';
 import 'package:digify/homepage/pagesinside/verify_page.dart';
 import 'package:flutter/material.dart';

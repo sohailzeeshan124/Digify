@@ -6,7 +6,7 @@ import 'package:digify/viewmodels/firebase_viewmodel.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'homepage/home_page.dart';
+import '../homepage/home_page.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'signup_page.dart';
 import 'ForgotPasswordScreen.dart'; // Import Reset Password Screen
@@ -168,13 +168,12 @@ class _SignInScreenState extends State<SignInScreen> {
 
                 Center(
                   child: GestureDetector(
-                    onTap:
-                        () => Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (context) => SignUpScreen(),
-                          ),
-                        ),
+                    onTap: () => Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => SignUpScreen(),
+                      ),
+                    ),
                     child: RichText(
                       text: TextSpan(
                         text: "Don't have an account? ",
@@ -213,22 +212,19 @@ class _SignInScreenState extends State<SignInScreen> {
         controller: controller,
         obscureText: isPassword ? _obscurePassword : false,
         decoration: InputDecoration(
-          prefixIcon:
-              isPassword
-                  ? IconButton(
-                    icon: Icon(
-                      _obscurePassword
-                          ? Icons.visibility_off
-                          : Icons.visibility,
-                      color: AppColors.primaryGreen,
-                    ),
-                    onPressed: () {
-                      setState(() {
-                        _obscurePassword = !_obscurePassword;
-                      });
-                    },
-                  )
-                  : Icon(icon, color: AppColors.primaryGreen),
+          prefixIcon: isPassword
+              ? IconButton(
+                  icon: Icon(
+                    _obscurePassword ? Icons.visibility_off : Icons.visibility,
+                    color: AppColors.primaryGreen,
+                  ),
+                  onPressed: () {
+                    setState(() {
+                      _obscurePassword = !_obscurePassword;
+                    });
+                  },
+                )
+              : Icon(icon, color: AppColors.primaryGreen),
           hintText: hintText,
           hintStyle: GoogleFonts.poppins(color: Colors.black45),
           filled: true,

@@ -1,4 +1,4 @@
-import 'package:digify/email_verification.dart';
+import 'package:digify/authentication/email_verification.dart';
 import 'package:digify/utils/app_colors.dart';
 import 'package:digify/viewmodels/firebase_viewmodel.dart';
 import 'package:flutter/material.dart';
@@ -80,7 +80,6 @@ class _SignUpScreenState extends State<SignUpScreen> {
                   style: GoogleFonts.poppins(fontSize: 14),
                 ),
                 const SizedBox(height: 20),
-
                 _buildemailTextField(
                   Icons.email,
                   "Enter your email",
@@ -108,9 +107,7 @@ class _SignUpScreenState extends State<SignUpScreen> {
                   },
                   _confirmPasswordController,
                 ),
-
                 const SizedBox(height: 20),
-
                 ElevatedButton(
                   onPressed: _signUp,
                   style: ElevatedButton.styleFrom(
@@ -128,9 +125,7 @@ class _SignUpScreenState extends State<SignUpScreen> {
                     ),
                   ),
                 ),
-
                 const SizedBox(height: 20),
-
                 Center(
                   child: GestureDetector(
                     onTap: () {

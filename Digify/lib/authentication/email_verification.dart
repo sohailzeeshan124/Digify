@@ -10,7 +10,7 @@ class EmailVerificationPage extends StatefulWidget {
   final String email;
 
   const EmailVerificationPage({Key? key, required this.email})
-    : super(key: key);
+      : super(key: key);
 
   @override
   _EmailVerificationPageState createState() => _EmailVerificationPageState();
@@ -107,13 +107,13 @@ class _EmailVerificationPageState extends State<EmailVerificationPage> {
               const SizedBox(height: 20),
               isEmailSent
                   ? const Text(
-                    "Verification email sent!",
-                    style: TextStyle(
-                      fontSize: 16,
-                      color: AppColors.primaryGreen,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  )
+                      "Verification email sent!",
+                      style: TextStyle(
+                        fontSize: 16,
+                        color: AppColors.primaryGreen,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    )
                   : const CircularProgressIndicator(), // Show loading until email is sent
             ],
           ),

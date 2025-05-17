@@ -1,0 +1,87 @@
+import 'package:digify/homepage/pagesinside/creation/create_pdf_page.dart';
+import 'package:flutter/material.dart';
+
+class CreatePage extends StatelessWidget {
+  const CreatePage({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text("Create"),
+        backgroundColor: const Color(0xFF274A31),
+      ),
+      body: Padding(
+        padding: const EdgeInsets.all(16.0),
+        child: ListView(
+          children: [
+            _buildOptionCard(
+              icon: Icons.picture_as_pdf,
+              title: 'Create PDF',
+              subtitle: 'Combine images into a PDF file',
+              onTap: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                      builder: (context) => const CreatePdfPage()),
+                );
+              },
+            ),
+            const SizedBox(height: 16),
+            _buildOptionCard(
+              icon: Icons.edit_document,
+              title: 'Create Signed Document',
+              subtitle: 'Digitally sign your documents',
+              onTap: () {
+                // Navigate to Signed Document screen
+              },
+            ),
+            const SizedBox(height: 16),
+            _buildOptionCard(
+              icon: Icons.workspace_premium,
+              title: 'Create Certificate',
+              subtitle: 'Design and issue certificates',
+              onTap: () {
+                // Navigate to Certificate Creator
+              },
+            ),
+            const SizedBox(height: 16),
+            _buildOptionCard(
+              icon: Icons.document_scanner,
+              title: 'Image to Text to Doc',
+              subtitle: 'Convert image text to editable document',
+              onTap: () {
+                // Navigate to OCR + Doc Creator
+              },
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildOptionCard({
+    required IconData icon,
+    required String title,
+    required String subtitle,
+    required VoidCallback onTap,
+  }) {
+    return Card(
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      elevation: 4,
+      child: ListTile(
+        contentPadding: const EdgeInsets.all(16),
+        leading: CircleAvatar(
+          radius: 28,
+          backgroundColor: const Color(0xFF274A31),
+          child: Icon(icon, color: Colors.white, size: 28),
+        ),
+        title: Text(title,
+            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
+        subtitle: Text(subtitle),
+        trailing: const Icon(Icons.arrow_forward_ios),
+        onTap: onTap,
+      ),
+    );
+  }
+}
