@@ -1,13 +1,8 @@
 import 'dart:io';
-import 'dart:typed_data';
 import 'package:digify/homepage/pagesinside/creation/PdfPreviewPage.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_doc_scanner/flutter_doc_scanner.dart';
-import 'package:pdf/pdf.dart';
-import 'package:pdf/widgets.dart' as pw;
-import 'package:path_provider/path_provider.dart';
 import 'package:permission_handler/permission_handler.dart';
-import 'package:open_filex/open_filex.dart';
 import 'package:share_plus/share_plus.dart';
 
 class CreatePdfPage extends StatefulWidget {

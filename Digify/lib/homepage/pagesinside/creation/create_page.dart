@@ -1,5 +1,6 @@
 import 'package:digify/homepage/pagesinside/creation/create_pdf_page.dart';
 import 'package:flutter/material.dart';
+import 'package:digify/homepage/pagesinside/creation/image_to_docx_screen.dart';
 
 class CreatePage extends StatelessWidget {
   const CreatePage({super.key});
@@ -51,7 +52,12 @@ class CreatePage extends StatelessWidget {
               title: 'Image to Text to Doc',
               subtitle: 'Convert image text to editable document',
               onTap: () {
-                // Navigate to OCR + Doc Creator
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => const ImageToDocxScreen(),
+                  ),
+                );
               },
             ),
           ],

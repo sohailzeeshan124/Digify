@@ -55,8 +55,8 @@ dependencies:
   share_plus: ^11.0.0
   file_picker: ^10.1.9
   syncfusion_flutter_pdfviewer: ^29.2.4
-  
-
+  google_mlkit_text_recognition: ^0.15.0
+  archive: ^3.4.10
 
 dev_dependencies:
   flutter_test:
@@ -84,6 +84,7 @@ flutter:
     - assets/signup_illustration.png
     - assets/signin_illustration.png
     - assets/reset_password_illustration.png
+    - assets/template.docx
 
   # To add assets to your application, add an assets section, like this:
   # assets:
