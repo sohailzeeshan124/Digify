@@ -1,5 +1,6 @@
 import 'dart:io';
 import 'dart:typed_data';
+import 'package:digify/homepage/pagesinside/creation/PdfPreviewPage.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_doc_scanner/flutter_doc_scanner.dart';
 import 'package:pdf/pdf.dart';
@@ -44,13 +45,33 @@ class _CreatePdfPageState extends State<CreatePdfPage> {
           scannedDocs.containsKey('pdfUri')) {
         final pdfUri = scannedDocs['pdfUri'];
         final pdfPath = Uri.parse(pdfUri).toFilePath();
-        final file = File(pdfPath);
+        final originalFile = File(pdfPath);
 
-        if (await file.exists()) {
+        if (await originalFile.exists()) {
           debugPrint('✅ PDF file exists at: $pdfPath');
 
-          // Open PDF
-          await OpenFilex.open(file.path);
+          // Create a better destination folder: /Documents/Digify
+          final targetDir = Directory('/storage/emulated/0/Documents/Digify');
+          if (!await targetDir.exists()) {
+            await targetDir.create(recursive: true);
+          }
+
+          // Generate a unique name for the scanned file
+          final timestamp = DateTime.now().millisecondsSinceEpoch;
+          final newFilePath =
+              '${targetDir.path}/Scanned_Document_$timestamp.pdf';
+
+          // Move the file
+          final movedFile = await originalFile.copy(newFilePath);
+          debugPrint('✅ PDF moved to: ${movedFile.path}');
+
+          if (!mounted) return;
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (_) => PdfPreviewPage(pdfFile: movedFile),
+            ),
+          );
         } else {
           debugPrint('❌ PDF file does not exist.');
         }
@@ -68,50 +89,50 @@ class _CreatePdfPageState extends State<CreatePdfPage> {
     }
   }
 
-  Future<void> generatePdf() async {
-    if (scannedImages.isEmpty) {
-      debugPrint('No images to generate PDF.');
-      return;
-    }
+  // Future<void> generatePdf() async {
+  //   if (scannedImages.isEmpty) {
+  //     debugPrint('No images to generate PDF.');
+  //     return;
+  //   }
 
-    final pdf = pw.Document();
+  //   final pdf = pw.Document();
 
-    for (File imageFile in scannedImages) {
-      final Uint8List imageBytes = await imageFile.readAsBytes();
-      final pw.MemoryImage image = pw.MemoryImage(imageBytes);
+  //   for (File imageFile in scannedImages) {
+  //     final Uint8List imageBytes = await imageFile.readAsBytes();
+  //     final pw.MemoryImage image = pw.MemoryImage(imageBytes);
 
-      pdf.addPage(
-        pw.Page(
-          pageFormat: PdfPageFormat.a4,
-          build: (pw.Context context) => pw.Center(child: pw.Image(image)),
-        ),
-      );
-    }
+  //     pdf.addPage(
+  //       pw.Page(
+  //         pageFormat: PdfPageFormat.a4,
+  //         build: (pw.Context context) => pw.Center(child: pw.Image(image)),
+  //       ),
+  //     );
+  //   }
 
-    // Ask for storage permission
-    var status = await Permission.storage.request();
-    if (!status.isGranted) {
-      debugPrint('Storage permission not granted');
-      return;
-    }
+  //   // Ask for storage permission
+  //   var status = await Permission.storage.request();
+  //   if (!status.isGranted) {
+  //     debugPrint('Storage permission not granted');
+  //     return;
+  //   }
 
-    // Get path to save PDF
-    final outputDir =
-        await getExternalStorageDirectory(); // Can also use getDownloadsDirectory
-    final pdfFile = File(
-        "${outputDir!.path}/Scanned_Document_${DateTime.now().millisecondsSinceEpoch}.pdf");
+  //   // Get path to save PDF
+  //   final outputDir =
+  //       await getExternalStorageDirectory(); // Can also use getDownloadsDirectory
+  //   final pdfFile = File(
+  //       "${outputDir!.path}/Scanned_Document_${DateTime.now().millisecondsSinceEpoch}.pdf");
 
-    await pdfFile.writeAsBytes(await pdf.save());
+  //   await pdfFile.writeAsBytes(await pdf.save());
 
-    debugPrint("PDF saved to: ${pdfFile.path}");
+  //   debugPrint("PDF saved to: ${pdfFile.path}");
 
-    // Open the generated PDF
-    openPdf(pdfFile.path);
-  }
+  //   // Open the generated PDF
+  //   openPdf(pdfFile.path);
+  // }
 
-  void openPdf(String path) {
-    OpenFilex.open(path);
-  }
+  // void openPdf(String path) {
+  //   OpenFilex.open(path);
+  // }
 
   void sharePdf() {
     if (generatedPdf != null) {
