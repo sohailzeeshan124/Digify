@@ -1,6 +1,6 @@
-import 'package:digify/homepage/pagesinside/creation/create_pdf_page.dart';
+import 'package:digify/homepage/pagesinside/creation/pdf_creation/create_pdf_page.dart';
 import 'package:flutter/material.dart';
-import 'package:digify/homepage/pagesinside/creation/image_to_docx_screen.dart';
+import 'package:digify/homepage/pagesinside/creation/image_to_doc/image_to_docx_screen.dart';
 
 class CreatePage extends StatelessWidget {
   const CreatePage({super.key});

@@ -1,5 +1,5 @@
 import 'dart:io';
-import 'package:digify/homepage/pagesinside/creation/PdfPreviewPage.dart';
+import 'package:digify/homepage/pagesinside/creation/pdf_creation/PdfPreviewPage.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_doc_scanner/flutter_doc_scanner.dart';
 import 'package:permission_handler/permission_handler.dart';

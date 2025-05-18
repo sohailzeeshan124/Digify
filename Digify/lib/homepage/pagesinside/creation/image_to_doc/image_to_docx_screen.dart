@@ -3,7 +3,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:google_mlkit_text_recognition/google_mlkit_text_recognition.dart';
-import 'package:path_provider/path_provider.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:open_filex/open_filex.dart';
@@ -26,7 +25,6 @@ class _ImageToDocxScreenState extends State<ImageToDocxScreen> {
   bool _isProcessing = false;
   bool _isTextEdited = false;
   List<TextBlock> _textBlocks = [];
-  List<TextLine> _textLines = [];
   TextRecognizer? _textRecognizer;
 
   @override
@@ -71,8 +69,6 @@ class _ImageToDocxScreenState extends State<ImageToDocxScreen> {
       final recognizedText = await _textRecognizer!.processImage(inputImage);
       setState(() {
         _textBlocks = recognizedText.blocks;
-        _textLines =
-            recognizedText.blocks.expand((block) => block.lines).toList();
         _extractedText = _formatRecognizedText(recognizedText);
         _textController.text = _extractedText;
         _isTextEdited = false;
@@ -91,11 +87,13 @@ class _ImageToDocxScreenState extends State<ImageToDocxScreen> {
   String _formatRecognizedText(RecognizedText recognizedText) {
     final buffer = StringBuffer();
     String? currentBlockType;
-    double? lastLineHeight;
     double? lastLineBottom;
 
-    for (final block in recognizedText.blocks) {
-      // Detect block type based on text size, position, and language
+    // Sort blocks by vertical position for better document flow
+    final sortedBlocks = recognizedText.blocks.toList()
+      ..sort((a, b) => a.boundingBox.top.compareTo(b.boundingBox.top));
+
+    for (final block in sortedBlocks) {
       final blockType = _detectBlockType(block);
 
       if (blockType != currentBlockType) {
@@ -120,7 +118,6 @@ class _ImageToDocxScreenState extends State<ImageToDocxScreen> {
         buffer.write(formattedText);
         buffer.write('\n');
 
-        lastLineHeight = line.boundingBox.height;
         lastLineBottom = line.boundingBox.bottom;
       }
     }

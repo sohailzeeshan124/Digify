@@ -1,8 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'utils/firebase_options.dart';
-import 'authentication/signin_page.dart';
-
+import 'screens/splash_screen.dart';
 import 'package:firebase_core/firebase_core.dart';
 
 // Ensure this file exists
@@ -11,12 +10,26 @@ void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
   await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
-  runApp(ProviderScope(child: MyApp()));
+  runApp(const ProviderScope(child: MyApp()));
 }
 
 class MyApp extends StatelessWidget {
+  const MyApp({super.key});
+
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(debugShowCheckedModeBanner: false, home: SignInScreen());
+    return MaterialApp(
+      debugShowCheckedModeBanner: false,
+      title: 'Digify',
+      theme: ThemeData(
+        primaryColor: const Color(0xFF274A31),
+        colorScheme: ColorScheme.fromSeed(
+          seedColor: const Color(0xFF274A31),
+          primary: const Color(0xFF274A31),
+        ),
+        useMaterial3: true,
+      ),
+      home: const SplashScreen(),
+    );
   }
 }
