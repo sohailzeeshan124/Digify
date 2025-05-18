@@ -1,4 +1,6 @@
+import 'package:digify/homepage/pagesinside/creation/document_sign/document_sign_screen.dart';
 import 'package:digify/homepage/pagesinside/creation/pdf_creation/create_pdf_page.dart';
+import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:digify/homepage/pagesinside/creation/image_to_doc/image_to_docx_screen.dart';
 
@@ -33,8 +35,34 @@ class CreatePage extends StatelessWidget {
               icon: Icons.edit_document,
               title: 'Create Signed Document',
               subtitle: 'Digitally sign your documents',
-              onTap: () {
-                // Navigate to Signed Document screen
+              onTap: () async {
+                // Pick a PDF from device
+                final result = await FilePicker.platform.pickFiles(
+                  type: FileType.custom,
+                  allowedExtensions: ['pdf'],
+                );
+
+                if (result != null && result.files.single.path != null) {
+                  final pdfPath = result.files.single.path!;
+                  final documentId = result.files.single.name
+                      .split('.')
+                      .first; // OR generate a UUID
+
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => DocumentSignScreen(
+                        pdfPath: pdfPath,
+                        documentId: documentId,
+                      ),
+                    ),
+                  );
+                } else {
+                  // User canceled the picker
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(content: Text("No PDF selected.")),
+                  );
+                }
               },
             ),
             const SizedBox(height: 16),

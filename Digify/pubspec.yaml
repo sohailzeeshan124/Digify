@@ -58,6 +58,9 @@ dependencies:
   google_mlkit_text_recognition: ^0.15.0
   archive: ^3.4.10
   connectivity_plus: ^5.0.2
+  printing: ^5.14.2
+  qr_flutter: ^4.1.0
+  image: ^4.3.0
 
 dev_dependencies:
   flutter_test:
