@@ -13,6 +13,7 @@ import 'package:provider/provider.dart';
 import 'package:syncfusion_flutter_pdfviewer/pdfviewer.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:path/path.dart' as p;
 
 class DocumentSignScreen extends StatefulWidget {
   final String pdfPath;
@@ -30,6 +31,7 @@ class _DocumentSignScreenState extends State<DocumentSignScreen> {
   double rotation = 0.0;
   double signatureWidth = 100;
   double signatureHeight = 60;
+  bool isDragging = false;
 
   Future<void> pickSignatureImage() async {
     final picked = await ImagePicker().pickImage(source: ImageSource.gallery);
@@ -50,6 +52,49 @@ class _DocumentSignScreenState extends State<DocumentSignScreen> {
         return;
       }
 
+      // Show loading indicator
+      showDialog(
+        context: context,
+        barrierDismissible: false,
+        builder: (context) => const Center(
+          child: CircularProgressIndicator(),
+        ),
+      );
+
+      // First, create the Firestore document to get the UID
+      final docRef = FirebaseFirestore.instance.collection('documents').doc();
+      final docId = docRef.id;
+
+      // Get the filename from the PDF path
+      final fileName = widget.pdfPath.split('/').last.replaceAll('.pdf', '');
+
+      // Get current user data
+      final currentUser = FirebaseAuth.instance.currentUser;
+      final userdataviewmodel = UserViewModel();
+      final UserData? userData =
+          await userdataviewmodel.fetchUserData(currentUser!.uid);
+
+      // Create the document model
+      final document = DocumentModel(
+        docId: docId,
+        docName: fileName,
+        uploadedBy: currentUser.uid,
+        createdAt: DateTime.now(),
+        pdfUrl: widget.pdfPath, // Use original path initially
+        qrCodeUrl: 'qr_code_url_if_applicable',
+        signedBy: [
+          SignerInfo(
+            uid: currentUser.uid,
+            displayName: userData!.username,
+            signedAt: DateTime.now(),
+          )
+        ],
+      );
+
+      // Save to Firestore first
+      await docRef.set(document.toMap());
+
+      // Now modify the PDF with signature and QR code
       final signedPdfPath = await PdfUtils.embedSignature(
         pdfPath: widget.pdfPath,
         signaturePath: signatureImage!.path,
@@ -58,49 +103,36 @@ class _DocumentSignScreenState extends State<DocumentSignScreen> {
         rotation: rotation,
       );
 
-      await PdfUtils.appendQrCodePage(signedPdfPath, widget.documentId);
+      // Add QR code page with the Firestore document UID
+      await PdfUtils.appendQrCodePage(signedPdfPath, docId);
 
-      final currentUser = FirebaseAuth.instance.currentUser;
-      final userdataviewmodel = UserViewModel();
-      final UserData? userData =
-          await userdataviewmodel.fetchUserData(currentUser!.uid);
+      // After all PDF modifications (signature + QR code)
+      final docsDir = await getExternalStorageDirectory();
+      final signedDocsDir = Directory(p.join(docsDir!.path, 'signed_docs'));
+      if (!await signedDocsDir.exists()) {
+        await signedDocsDir.create(recursive: true);
+      }
+      final finalPath = p.join(signedDocsDir.path, '${fileName}_signed.pdf');
+      await File(signedPdfPath).copy(finalPath);
 
-      final docRef = FirebaseFirestore.instance.collection('documents').doc();
-      final docId = docRef.id;
+      // Update Firestore with the new path
+      await docRef.update({
+        'pdfUrl': finalPath,
+      });
 
-      // Get the filename from the PDF path
-      final fileName = widget.pdfPath.split('/').last.replaceAll('.pdf', '');
-
-      final document = DocumentModel(
-        docId: docId,
-        docName: fileName,
-        uploadedBy: currentUser!.uid,
-        createdAt: DateTime.now(),
-        pdfUrl: signedPdfPath,
-        qrCodeUrl: 'qr_code_url_if_applicable',
-        signedBy: [
-          SignerInfo(
-            uid: currentUser!.uid,
-            displayName: userData!.username,
-            signedAt: DateTime.now(),
-          )
-        ],
-      );
-
-      await viewmodel.finalizeSignature(document);
-
-      await docRef.set(document.toMap());
-
-      final directory = await getExternalStorageDirectory();
-      final outputPath = '${directory?.path}/your_filename.pdf';
-      await File(signedPdfPath).copy(outputPath);
+      // Close loading dialog
+      Navigator.of(context).pop();
 
       ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text("Document signed successfully.")));
       Navigator.pop(context);
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text("Error signing document: \$e")));
+      // Close loading dialog if it's showing
+      if (Navigator.canPop(context)) {
+        Navigator.of(context).pop();
+      }
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text("Error signing document: $e")));
     }
   }
 
@@ -116,39 +148,35 @@ class _DocumentSignScreenState extends State<DocumentSignScreen> {
               left: offset.dx,
               top: offset.dy,
               child: GestureDetector(
+                onScaleStart: (details) {
+                  // Optionally store initial values if needed
+                },
                 onScaleUpdate: (details) {
                   setState(() {
-                    offset += details.focalPointDelta;
                     scale = details.scale;
                     rotation = details.rotation;
+                    offset += details.focalPointDelta;
                   });
                 },
                 child: Transform.rotate(
                   angle: rotation,
-                  child: Image.file(
-                    signatureImage!,
-                    width: signatureWidth,
-                    height: signatureHeight,
+                  child: Container(
+                    width: signatureWidth * scale,
+                    height: signatureHeight * scale,
+                    decoration: BoxDecoration(
+                      border: Border.all(
+                        color: Colors.blue,
+                        width: 1,
+                      ),
+                    ),
+                    child: Image.file(
+                      signatureImage!,
+                      fit: BoxFit.contain,
+                    ),
                   ),
                 ),
               ),
             ),
-          // Bottom-right resize handle
-          Positioned(
-            right: 0,
-            bottom: 0,
-            child: GestureDetector(
-              onPanUpdate: (details) {
-                setState(() {
-                  signatureWidth += details.delta.dx;
-                  signatureHeight += details.delta.dy;
-                  if (signatureWidth < 30) signatureWidth = 30;
-                  if (signatureHeight < 20) signatureHeight = 20;
-                });
-              },
-              child: Icon(Icons.open_in_full, size: 24),
-            ),
-          ),
         ],
       ),
       floatingActionButton: Column(

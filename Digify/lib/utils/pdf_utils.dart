@@ -16,8 +16,11 @@ class PdfUtils {
     required double scale,
     required double rotation,
   }) async {
+    // Load the original PDF
     final originalPdf = File(pdfPath).readAsBytesSync();
     final document = PdfDocument(inputBytes: originalPdf);
+
+    // Load and decode the signature image
     final signatureImage = File(signaturePath).readAsBytesSync();
     final img.Image decodedSignature = img.decodeImage(signatureImage)!;
 
@@ -49,16 +52,23 @@ class PdfUtils {
     final outputDir = await getTemporaryDirectory();
     final outputPath = '${outputDir.path}/signed_document.pdf';
     final outputFile = File(outputPath);
-    await outputFile.writeAsBytes(await document.save());
+    final bytes = await document.save();
+    await outputFile.writeAsBytes(bytes);
     document.dispose();
+
     return outputPath;
   }
 
   /// Appends a final page with a QR code that links to the Firestore document
   static Future<void> appendQrCodePage(String pdfPath, String docId) async {
-    final document = PdfDocument(inputBytes: File(pdfPath).readAsBytesSync());
-    final qrData = 'https://your-app.firebaseapp.com/document/$docId';
+    // Load the PDF
+    final pdfBytes = File(pdfPath).readAsBytesSync();
+    final document = PdfDocument(inputBytes: pdfBytes);
 
+    // Generate QR code data using the Firestore document UID
+    final qrData = docId; // Just use the document UID
+
+    // Generate QR code image
     final qrImage = await QrPainter(
       data: qrData,
       version: QrVersions.auto,
@@ -101,7 +111,8 @@ class PdfUtils {
     );
 
     // Save the document
-    await File(pdfPath).writeAsBytes(await document.save());
+    final bytes = await document.save();
+    await File(pdfPath).writeAsBytes(bytes);
     document.dispose();
   }
 }
