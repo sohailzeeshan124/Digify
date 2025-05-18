@@ -12,6 +12,22 @@ class Result<T> {
 class DocumentRepository {
   final _firestore = FirebaseFirestore.instance;
 
+  Future<Result<DocumentModel>> getDocument(String uid) async {
+    try {
+      final docRef = _firestore.collection('documents').doc(uid);
+      final snapshot = await docRef.get();
+
+      if (snapshot.exists) {
+        final document = DocumentModel.fromMap(snapshot.data()!);
+        return Result.success(document);
+      } else {
+        return Result.failure("Document not found");
+      }
+    } catch (e) {
+      return Result.failure("Error fetching document: ${e.toString()}");
+    }
+  }
+
   Future<Result<void>> uploadOrUpdateDocument(DocumentModel doc) async {
     try {
       final docRef = _firestore.collection('documents').doc(doc.docId);

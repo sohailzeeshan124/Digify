@@ -41,7 +41,6 @@ class _DocumentSignScreenState extends State<DocumentSignScreen> {
   }
 
   void onFinalizeAndSign() async {
-    //final viewModel = Provider.of<DocumentViewModel>(context, listen: false);
     final viewmodel = DocumentViewModel();
 
     try {
@@ -69,9 +68,12 @@ class _DocumentSignScreenState extends State<DocumentSignScreen> {
       final docRef = FirebaseFirestore.instance.collection('documents').doc();
       final docId = docRef.id;
 
+      // Get the filename from the PDF path
+      final fileName = widget.pdfPath.split('/').last.replaceAll('.pdf', '');
+
       final document = DocumentModel(
         docId: docId,
-        docName: 'Some Name',
+        docName: fileName,
         uploadedBy: currentUser!.uid,
         createdAt: DateTime.now(),
         pdfUrl: signedPdfPath,

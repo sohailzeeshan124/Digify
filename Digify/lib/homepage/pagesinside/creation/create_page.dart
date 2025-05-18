@@ -11,7 +11,10 @@ class CreatePage extends StatelessWidget {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text("Create"),
+        title: const Text(
+          "Create",
+          style: TextStyle(color: Colors.white),
+        ),
         backgroundColor: const Color(0xFF274A31),
       ),
       body: Padding(
