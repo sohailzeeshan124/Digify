@@ -5,6 +5,7 @@ import 'package:digify/homepage/pagesinside/profile_page.dart';
 import 'package:digify/homepage/pagesinside/verify/verify_page.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:digify/utils/app_colors.dart';
 
 class MainPage extends StatelessWidget {
   @override

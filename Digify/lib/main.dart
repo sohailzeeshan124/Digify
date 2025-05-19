@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'utils/firebase_options.dart';
 import 'screens/splash_screen.dart';
 import 'package:firebase_core/firebase_core.dart';
+import 'package:digify/utils/app_colors.dart';
 
 // Ensure this file exists
 
@@ -22,11 +23,11 @@ class MyApp extends StatelessWidget {
       debugShowCheckedModeBanner: false,
       title: 'Digify',
       theme: ThemeData(
-        primaryColor: const Color(0xFF274A31),
         colorScheme: ColorScheme.fromSeed(
-          seedColor: const Color(0xFF274A31),
-          primary: const Color(0xFF274A31),
+          seedColor: AppColors.primaryGreen,
+          primary: AppColors.primaryGreen,
         ),
+        primaryColor: AppColors.primaryGreen,
         useMaterial3: true,
       ),
       home: const SplashScreen(),

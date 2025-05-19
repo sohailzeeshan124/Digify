@@ -6,20 +6,26 @@ class ChannelList extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      width: 240,
-      color: const Color(0xFF2F3136),
+      width: 160,
+      color: const Color(0xFFF7F7F7),
       child: Column(
         children: [
           _buildHeader(),
-          _buildChannelCategory('TEXT CHANNELS'),
-          _buildChannelItem('# general', Icons.chat_bubble_outline),
-          _buildChannelItem('# announcements', Icons.announcement_outlined),
-          _buildChannelItem('# rules', Icons.gavel_outlined),
-          _buildChannelCategory('VOICE CHANNELS'),
-          _buildChannelItem('🎮 Gaming', Icons.headset),
-          _buildChannelItem('🎵 Music', Icons.music_note),
-          _buildChannelItem('🎬 Movies', Icons.movie),
-          const Spacer(),
+          Expanded(
+            child: ListView(
+              children: [
+                _buildChannelCategory('TEXT CHANNELS'),
+                _buildChannelItem('# general', Icons.chat_bubble_outline),
+                _buildChannelItem(
+                    '# announcements', Icons.announcement_outlined),
+                _buildChannelItem('# rules', Icons.gavel_outlined),
+                _buildChannelCategory('VOICE CHANNELS'),
+                _buildChannelItem('🎮 Gaming', Icons.headset),
+                _buildChannelItem('🎵 Music', Icons.music_note),
+                _buildChannelItem('🎬 Movies', Icons.movie),
+              ],
+            ),
+          ),
           _buildUserInfo(),
         ],
       ),

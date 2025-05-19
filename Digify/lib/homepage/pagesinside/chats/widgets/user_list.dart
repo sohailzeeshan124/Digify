@@ -6,8 +6,8 @@ class UserList extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      width: 240,
-      color: const Color(0xFF2F3136),
+      width: 140,
+      color: const Color(0xFFF7F7F7),
       child: Column(
         children: [
           _buildHeader(),
@@ -33,8 +33,8 @@ class UserList extends StatelessWidget {
         color: Color(0xFF36393F),
         border: Border(bottom: BorderSide(color: Color(0xFF202225), width: 1)),
       ),
-      child: Row(
-        children: const [
+      child: const Row(
+        children: [
           Text(
             'ONLINE — 15',
             style: TextStyle(

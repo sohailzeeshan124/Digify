@@ -1,5 +1,6 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:digify/modalclasses/document_model.dart';
+import 'dart:io';
 
 class Result<T> {
   final T? data;
@@ -56,6 +57,28 @@ class DocumentRepository {
       return Result.success(null);
     } catch (e) {
       return Result.failure("Firestore Error: ${e.toString()}");
+    }
+  }
+
+  Future<Result<void>> deleteDocument(String docId, String pdfUrl) async {
+    try {
+      // Delete from Firestore
+      await _firestore.collection('documents').doc(docId).delete();
+
+      // Delete local file if it exists
+      try {
+        final file = File(pdfUrl);
+        if (await file.exists()) {
+          await file.delete();
+        }
+      } catch (e) {
+        print('Error deleting local file: $e');
+        // Continue even if local file deletion fails
+      }
+
+      return Result.success(null);
+    } catch (e) {
+      return Result.failure("Error deleting document: ${e.toString()}");
     }
   }
 }
