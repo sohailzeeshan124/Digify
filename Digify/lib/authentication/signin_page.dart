@@ -1,12 +1,12 @@
-import 'package:digify/modalclasses/User_modal.dart';
-import 'package:digify/profile_completion_screens.dart';
+import 'package:digify/complete_your_profile/profile_completion_screen.dart';
+import 'package:digify/mainpage.dart';
+import 'package:digify/modal_classes/user_data.dart';
 import 'package:digify/utils/app_colors.dart';
-import 'package:digify/viewmodels/User_viewmodal.dart';
 import 'package:digify/viewmodels/firebase_viewmodel.dart';
+import 'package:digify/viewmodels/user_viewmodel.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import '../homepage/home_page.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'signup_page.dart';
 import 'ForgotPasswordScreen.dart'; // Import Reset Password Screen
@@ -51,7 +51,7 @@ class _SignInScreenState extends State<SignInScreen> {
         _passwordController.text,
       );
       if (user != null) {
-        UserData? userfirestoreData = await userviewmodel.fetchUserData(
+        UserData? userfirestoreData = await userviewmodel.getUser(
           user.uid,
         );
 
@@ -69,7 +69,7 @@ class _SignInScreenState extends State<SignInScreen> {
         }
       } else {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
+          const SnackBar(
             content: Text("Invalid email or password"),
             backgroundColor: Colors.red,
           ),

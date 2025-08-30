@@ -1,49 +1,26 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:digify/modalclasses/User_modal.dart';
+import 'package:digify/modal_classes/user_data.dart';
 
 class UserRepository {
-  final FirebaseFirestore _firestore = FirebaseFirestore.instance;
+  final CollectionReference users =
+      FirebaseFirestore.instance.collection('users');
 
-  // Save user data to Firestore
-  Future<bool> saveUserData(UserData userData) async {
-    try {
-      await _firestore
-          .collection('users')
-          .doc(userData.userId)
-          .set(userData.toMap());
-      return true;
-    } catch (e) {
-      print('Error saving user data: $e');
-      return false;
-    }
+  // Create or update user
+  Future<void> saveUser(UserData user) async {
+    await users.doc(user.userId).set(user.toMap());
   }
 
-  // Fetch user data from Firestore
-  Future<UserData?> getUserData(String userId) async {
-    try {
-      DocumentSnapshot doc =
-          await _firestore.collection('users').doc(userId).get();
-      if (doc.exists) {
-        return UserData.fromFirestore(doc.data() as Map<String, dynamic>);
-      }
-      return null;
-    } catch (e) {
-      print('Error fetching user data: $e');
-      return null;
+  // Get user by ID
+  Future<UserData?> getUser(String userId) async {
+    final doc = await users.doc(userId).get();
+    if (doc.exists) {
+      return UserData.fromMap(doc.data() as Map<String, dynamic>);
     }
+    return null;
   }
 
-  // 🔥 Delete user data from Firestore
-  Future<bool> deleteUserData(String userId) async {
-    try {
-      await _firestore.collection('users').doc(userId).delete();
-      return true;
-      // ignore: dead_code
-      print('User data deleted successfully.');
-    } catch (e) {
-      return false;
-      // ignore: dead_code
-      print('Error deleting user data: $e');
-    }
+  // Delete user
+  Future<void> deleteUser(String userId) async {
+    await users.doc(userId).delete();
   }
 }
