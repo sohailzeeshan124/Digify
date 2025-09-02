@@ -1,21 +1,23 @@
+import 'package:digify/cloudinary/cloudinary_repository.dart';
 import 'package:digify/modal_classes/user_data.dart';
 import 'package:digify/repositories/user_repository.dart';
 
 class UserViewModel {
-  final UserRepository _repository = UserRepository();
+  final UserRepository _repo = UserRepository();
 
-  // Save user
-  Future<void> saveUser(UserData user) async {
-    await _repository.saveUser(user);
+  Future<void> createUser(UserModel user) async {
+    await _repo.createUser(user);
   }
 
-  // Get user
-  Future<UserData?> getUser(String userId) async {
-    return await _repository.getUser(userId);
+  Future<UserModel?> getUser(String uid) async {
+    return await _repo.getUser(uid);
   }
 
-  // Delete user
-  Future<void> deleteUser(String userId) async {
-    await _repository.deleteUser(userId);
+  Future<void> updateUser(String uid, Map<String, dynamic> data) async {
+    await _repo.updateUser(uid, data);
+  }
+
+  Future<void> deleteUser(String uid) async {
+    await _repo.deleteUser(uid);
   }
 }

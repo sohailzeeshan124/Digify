@@ -11,6 +11,8 @@ void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
   await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
+  //await dotenv.load(fileName: "lib/.env");
+
   runApp(const ProviderScope(child: MyApp()));
 }
 

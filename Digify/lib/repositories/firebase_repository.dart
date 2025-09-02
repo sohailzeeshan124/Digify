@@ -7,14 +7,25 @@ class Firebase_Repository {
     return _auth.currentUser;
   }
 
-  Future<User?> signUp(String email, String password) async {
+  Future<AuthResult> signUp(String email, String password) async {
     try {
       UserCredential userCredential = await _auth
           .createUserWithEmailAndPassword(email: email, password: password);
-      return userCredential.user;
+      return AuthResult(user: userCredential.user);
+    } on FirebaseAuthException catch (e) {
+      String message;
+      if (e.code == 'email-already-in-use') {
+        message = 'This email is already registered. Please log in instead.';
+      } else if (e.code == 'invalid-email') {
+        message = 'The email address is not valid.';
+      } else if (e.code == 'weak-password') {
+        message = 'The password is too weak. Please choose a stronger one.';
+      } else {
+        message = 'Sign up failed. Please try again.';
+      }
+      return AuthResult(errorMessage: message);
     } catch (e) {
-      print("Error signing up: $e");
-      return null;
+      return AuthResult(errorMessage: 'An unexpected error occurred.');
     }
   }
 
@@ -25,9 +36,18 @@ class Firebase_Repository {
         password: password,
       );
       return userCredential.user;
+    } on FirebaseAuthException catch (e) {
+      if (e.code == 'user-not-found') {
+        throw Exception("No account found for this email.");
+      } else if (e.code == 'wrong-password') {
+        throw Exception("Wrong password entered.");
+      } else if (e.code == 'invalid-email') {
+        throw Exception("Invalid email format.");
+      } else {
+        throw Exception("Sign in failed: ${e.message}");
+      }
     } catch (e) {
-      print("Error signing in: $e");
-      return null;
+      throw Exception("Sign in failed: $e");
     }
   }
 
@@ -35,17 +55,22 @@ class Firebase_Repository {
     await _auth.signOut();
   }
 
-  Future<void> updatePassword(String newPassword) async {
+  Future<void> sendPasswordResetEmail(String email) async {
     try {
-      User? user = _auth.currentUser;
-      if (user != null) {
-        await user.updatePassword(newPassword);
-        print("Password updated successfully");
-      } else {
-        print("No user signed in");
-      }
+      await _auth.sendPasswordResetEmail(email: email);
+      print("Password reset email sent");
     } catch (e) {
-      print("Error updating password: $e");
+      print("Error sending password reset email: $e");
+      rethrow;
     }
   }
+}
+
+class AuthResult {
+  final User? user;
+  final String? errorMessage;
+
+  AuthResult({this.user, this.errorMessage});
+
+  bool get isSuccess => user != null;
 }

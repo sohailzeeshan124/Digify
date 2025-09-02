@@ -1,4 +1,4 @@
-import 'package:digify/complete_your_profile/profile_completion_screen.dart';
+import 'package:digify/screens/complete_your_profile/profile_completion_screen.dart';
 import 'package:flutter/material.dart';
 // Import your Home Page
 

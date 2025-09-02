@@ -7,16 +7,16 @@ class FirebaseViewModel extends ChangeNotifier {
 
   User? get currentUser => _repository.getCurrentUser();
 
-  Future<User?> signIn(String email, String password) {
-    return _repository.signIn(email, password);
+  Future<User?> signIn(String email, String password) async {
+    return await _repository.signIn(email, password);
   }
 
-  Future<User?> signUp(String email, String password) {
+  Future<AuthResult> signUp(String email, String password) {
     return _repository.signUp(email, password);
   }
 
-  Future<void> updatePassword(String email) {
-    return _repository.updatePassword(email);
+  Future<void> sendPasswordResetEmail(String email) {
+    return _repository.sendPasswordResetEmail(email);
   }
 
   User? getCurrentUser() {

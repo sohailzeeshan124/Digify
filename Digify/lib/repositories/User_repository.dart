@@ -2,25 +2,26 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:digify/modal_classes/user_data.dart';
 
 class UserRepository {
-  final CollectionReference users =
-      FirebaseFirestore.instance.collection('users');
+  final _firestore = FirebaseFirestore.instance;
+  final String collection = "users";
 
-  // Create or update user
-  Future<void> saveUser(UserData user) async {
-    await users.doc(user.userId).set(user.toMap());
+  Future<void> createUser(UserModel user) async {
+    await _firestore.collection(collection).doc(user.uid).set(user.toMap());
   }
 
-  // Get user by ID
-  Future<UserData?> getUser(String userId) async {
-    final doc = await users.doc(userId).get();
+  Future<UserModel?> getUser(String uid) async {
+    final doc = await _firestore.collection(collection).doc(uid).get();
     if (doc.exists) {
-      return UserData.fromMap(doc.data() as Map<String, dynamic>);
+      return UserModel.fromMap(doc.data()!, uid);
     }
     return null;
   }
 
-  // Delete user
-  Future<void> deleteUser(String userId) async {
-    await users.doc(userId).delete();
+  Future<void> updateUser(String uid, Map<String, dynamic> data) async {
+    await _firestore.collection(collection).doc(uid).update(data);
+  }
+
+  Future<void> deleteUser(String uid) async {
+    await _firestore.collection(collection).doc(uid).delete();
   }
 }

@@ -10,27 +10,51 @@ class ForgotPasswordScreen extends StatefulWidget {
 
 class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
   final TextEditingController _emailController = TextEditingController();
-
-  final TextEditingController _passwordController = TextEditingController();
-  final TextEditingController _confirmPasswordController =
-      TextEditingController();
   final GlobalKey<FormState> _formKey = GlobalKey<FormState>();
 
   final viewmodel = FirebaseViewModel();
 
-  bool _obscureNewPassword = true;
-  bool _obscureConfirmPassword = true;
-
   void _resetPassword() async {
     if (_formKey.currentState!.validate()) {
-      await viewmodel.updatePassword(_emailController.text.trim());
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text("Password updated successfully!"),
-          backgroundColor: AppColors.primaryGreen,
-        ),
-      );
-      Navigator.pop(context);
+      try {
+        await viewmodel.sendPasswordResetEmail(_emailController.text.trim());
+
+        // ✅ Show success dialog
+        showDialog(
+          context: context,
+          builder: (context) => AlertDialog(
+            title: const Text("Email Sent"),
+            content: Text(
+              "We have sent a password reset link to ${_emailController.text.trim()}. Please check your inbox.",
+              style: GoogleFonts.poppins(fontSize: 14),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: const Text("OK"),
+              ),
+            ],
+          ),
+        );
+      } catch (e) {
+        // ❌ Show error popup
+        showDialog(
+          context: context,
+          builder: (context) => AlertDialog(
+            title: const Text("Error"),
+            content: Text(
+              e.toString(),
+              style: GoogleFonts.poppins(fontSize: 14, color: Colors.red),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: const Text("OK"),
+              ),
+            ],
+          ),
+        );
+      }
     }
   }
 
@@ -66,7 +90,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
                 ),
                 const SizedBox(height: 10),
                 Text(
-                  "Create new password",
+                  "Reset your password",
                   style: GoogleFonts.poppins(
                     fontSize: 24,
                     fontWeight: FontWeight.bold,
@@ -74,35 +98,13 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
                 ),
                 const SizedBox(height: 5),
                 Text(
-                  "Your new password must be different from previous used passwords.",
+                  "Enter your registered email, and we’ll send you a reset link.",
                   style: GoogleFonts.poppins(
                     fontSize: 14,
                     color: Colors.black54,
                   ),
                 ),
-                _buildemailTextField(Icons.email, "Email", _emailController),
-                _buildTextField(
-                  Icons.lock,
-                  "New Password",
-                  _obscureNewPassword,
-                  () {
-                    setState(() {
-                      _obscureNewPassword = !_obscureNewPassword;
-                    });
-                  },
-                  _passwordController,
-                ),
-                _buildTextField(
-                  Icons.lock,
-                  "Confirm Password",
-                  _obscureConfirmPassword,
-                  () {
-                    setState(() {
-                      _obscureConfirmPassword = !_obscureConfirmPassword;
-                    });
-                  },
-                  _confirmPasswordController,
-                ),
+                _buildEmailTextField(Icons.email, "Email", _emailController),
                 const SizedBox(height: 20),
                 ElevatedButton(
                   onPressed: _resetPassword,
@@ -114,7 +116,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
                     minimumSize: const Size(double.infinity, 50),
                   ),
                   child: Text(
-                    "Create",
+                    "Send Reset Link",
                     style: GoogleFonts.poppins(
                       fontSize: 16,
                       color: Colors.white,
@@ -129,26 +131,17 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
     );
   }
 
-  Widget _buildTextField(
+  Widget _buildEmailTextField(
     IconData icon,
     String hintText,
-    bool obscureText,
-    VoidCallback toggleVisibility,
     TextEditingController controller,
   ) {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 10),
       child: TextFormField(
         controller: controller,
-        obscureText: obscureText,
         decoration: InputDecoration(
-          prefixIcon: IconButton(
-            icon: Icon(
-              obscureText ? Icons.visibility_off : Icons.visibility,
-              color: AppColors.primaryGreen,
-            ),
-            onPressed: toggleVisibility,
-          ),
+          prefixIcon: Icon(icon, color: AppColors.primaryGreen),
           hintText: hintText,
           hintStyle: GoogleFonts.poppins(color: Colors.black45),
           filled: true,
@@ -162,47 +155,9 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
           if (value == null || value.isEmpty) {
             return "This field is required";
           }
-          if (controller == _passwordController && value.length < 6) {
-            return "Password must be at least 6 characters";
-          }
-          if (controller == _confirmPasswordController &&
-              value != _passwordController.text) {
-            return "Passwords do not match";
-          }
-          return null;
-        },
-      ),
-    );
-  }
-
-  Widget _buildemailTextField(
-    IconData icon,
-    String hintText,
-    TextEditingController controller,
-  ) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 10),
-      child: TextFormField(
-        controller: controller,
-        decoration: InputDecoration(
-          prefixIcon: Icon(icon),
-          hintText: hintText,
-          hintStyle: GoogleFonts.poppins(color: Colors.black45),
-          filled: true,
-          fillColor: Colors.grey.shade100,
-          border: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(10),
-            borderSide: BorderSide.none,
-          ),
-        ),
-        validator: (value) {
-          if (value == null || value.isEmpty) {
-            return "This field is required";
-          }
-          if (!controller.text.contains('@')) {
+          if (!value.contains('@')) {
             return "Invalid email";
           }
-
           return null;
         },
       ),

@@ -1,4 +1,4 @@
-import 'package:digify/complete_your_profile/profile_completion_screen.dart';
+import 'package:digify/screens/complete_your_profile/profile_completion_screen.dart';
 import 'package:digify/mainpage.dart';
 import 'package:digify/modal_classes/user_data.dart';
 import 'package:digify/viewmodels/user_viewmodel.dart';
@@ -69,7 +69,7 @@ class _SplashScreenState extends State<SplashScreen>
         } else {
           try {
             final viewmodel = UserViewModel();
-            final UserData? userData = await viewmodel.getUser(user.uid);
+            final UserModel? userData = await viewmodel.getUser(user.uid);
 
             if (userData == null) {
               Navigator.of(context).pushReplacement(
