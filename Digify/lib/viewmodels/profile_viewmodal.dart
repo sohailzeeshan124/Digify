@@ -45,10 +45,12 @@ class ProfileViewModel {
       }
     }
 
+    String uniqueUsername = await _repo.generateUniqueUsername(displayName);
+
     final user = UserModel(
       uid: uid,
       fullName: legalName,
-      username: displayName,
+      username: uniqueUsername,
       dateOfBirth: dob,
       cnicFrontUrl: frontUrl,
       cnicBackUrl: backUrl,

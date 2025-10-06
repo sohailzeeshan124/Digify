@@ -1,7 +1,6 @@
 // lib/features/profile_completion/profile_completion_screen.dart
 import 'dart:io';
-import 'package:digify/mainpage.dart';
-import 'package:digify/utils/CnicCameraScreen.dart';
+import 'package:digify/mainpage_folder/mainpage.dart';
 import 'package:digify/utils/app_colors.dart';
 import 'package:digify/viewmodels/profile_viewmodal.dart';
 import 'package:digify/widgets/signature_drawer_page.dart';
@@ -43,7 +42,6 @@ class _ProfileCompletionScreenState extends State<ProfileCompletionScreen> {
 
 // flag to indicate the signature was drawn (keeps UI separate)
   bool _signatureDrawn = false;
-  double _bgThreshold = 0.9;
 
   int _currentStep = 0;
   bool _isUploading = false;
@@ -222,7 +220,7 @@ class _ProfileCompletionScreenState extends State<ProfileCompletionScreen> {
 
       if (mounted) {
         Navigator.of(context).pushReplacement(
-            MaterialPageRoute(builder: (_) => const MainPage()));
+            MaterialPageRoute(builder: (_) => const Mainpage()));
       }
     } catch (e) {
       _showSnack('Failed: ${e.toString()}');

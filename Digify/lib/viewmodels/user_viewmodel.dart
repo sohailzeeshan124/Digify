@@ -1,4 +1,3 @@
-import 'package:digify/cloudinary/cloudinary_repository.dart';
 import 'package:digify/modal_classes/user_data.dart';
 import 'package:digify/repositories/user_repository.dart';
 

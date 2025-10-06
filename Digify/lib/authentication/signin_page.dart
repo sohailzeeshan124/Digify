@@ -1,5 +1,5 @@
 import 'package:digify/screens/complete_your_profile/profile_completion_screen.dart';
-import 'package:digify/mainpage.dart';
+import 'package:digify/mainpage_folder/mainpage.dart';
 import 'package:digify/modal_classes/user_data.dart';
 import 'package:digify/utils/app_colors.dart';
 import 'package:digify/viewmodels/firebase_viewmodel.dart';
@@ -72,7 +72,7 @@ class _SignInScreenState extends State<SignInScreen> {
           } else {
             await Navigator.pushReplacement(
               context,
-              MaterialPageRoute(builder: (context) => MainPage()),
+              MaterialPageRoute(builder: (context) => Mainpage()),
             );
           }
         }

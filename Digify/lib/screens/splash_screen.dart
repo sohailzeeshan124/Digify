@@ -1,6 +1,7 @@
 import 'package:digify/screens/complete_your_profile/profile_completion_screen.dart';
-import 'package:digify/mainpage.dart';
+import 'package:digify/mainpage_folder/mainpage.dart';
 import 'package:digify/modal_classes/user_data.dart';
+import 'package:digify/utils/notification_services.dart';
 import 'package:digify/viewmodels/user_viewmodel.dart';
 import 'package:digify/utils/app_colors.dart';
 import 'package:firebase_auth/firebase_auth.dart';
@@ -22,9 +23,20 @@ class _SplashScreenState extends State<SplashScreen>
   late AnimationController _progressController;
   late Animation<double> _progressAnimation;
 
+//  NotificationServices notificationServices = NotificationServices();
+
   @override
   void initState() {
     super.initState();
+
+    // notificationServices.requestNotificationPermission();
+
+    // notificationServices.getDeviceToken().then((value) {
+    //   print('Device Token: $value');
+    // });
+
+    // notificationServices.isTokenrefreshed();
+
     _progressController = AnimationController(
       vsync: this,
       duration: const Duration(seconds: 3),
@@ -77,14 +89,14 @@ class _SplashScreenState extends State<SplashScreen>
               );
             } else {
               Navigator.of(context).pushReplacement(
-                MaterialPageRoute(builder: (_) => MainPage()),
+                MaterialPageRoute(builder: (_) => Mainpage()),
               );
             }
           } catch (e) {
             // If there's an error getting user data, still navigate to main page
             // or handle the error appropriately
             Navigator.of(context).pushReplacement(
-              MaterialPageRoute(builder: (_) => MainPage()),
+              MaterialPageRoute(builder: (_) => Mainpage()),
             );
           }
         }
