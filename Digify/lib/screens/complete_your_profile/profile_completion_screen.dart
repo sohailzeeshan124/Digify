@@ -8,6 +8,7 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:local_rembg/local_rembg.dart';
 import 'package:path_provider/path_provider.dart';
 
@@ -150,11 +151,14 @@ class _ProfileCompletionScreenState extends State<ProfileCompletionScreen> {
 
   Future<void> _onNextPressed() async {
     if (_currentStep == 0) {
-      final dob = getSelectedDob();
-      if (!isAdult(dob)) {
-        _showSnack('You must be 18 years old or above to proceed.');
+      // ensure names are provided before proceeding to step 2
+      final legal = _legalNameCtrl.text.trim();
+      final display = _displayNameCtrl.text.trim();
+      if (legal.isEmpty || display.isEmpty) {
+        _showSnack('Please enter both Legal Name and Display Name.');
         return;
       }
+
       _goToStep(1);
     } else if (_currentStep == 1) {
       if (_cnicFront == null || _cnicBack == null) {
@@ -217,6 +221,50 @@ class _ProfileCompletionScreenState extends State<ProfileCompletionScreen> {
         cnicBack: _cnicBack,
         signatureFile: signature,
       );
+
+      // Update lastLogin and append session info (device, ip, loggedInAt)
+      try {
+        final userDocRef =
+            FirebaseFirestore.instance.collection('users').doc(user.uid);
+
+        String deviceName = Platform.operatingSystem;
+        try {
+          deviceName =
+              '${Platform.operatingSystem} ${Platform.operatingSystemVersion}';
+        } catch (_) {}
+
+        String ipAddress = '';
+        try {
+          final interfaces = await NetworkInterface.list(
+            includeLoopback: false,
+            includeLinkLocal: true,
+          );
+          for (final iface in interfaces) {
+            for (final addr in iface.addresses) {
+              if (!addr.isLoopback && addr.address.isNotEmpty) {
+                ipAddress = addr.address;
+                break;
+              }
+            }
+            if (ipAddress.isNotEmpty) break;
+          }
+        } catch (_) {
+          ipAddress = '';
+        }
+
+        final sessionEntry = {
+          'device': deviceName,
+          'ip': ipAddress,
+          'loggedInAt': DateTime.now(),
+        };
+
+        await userDocRef.set({
+          'lastLogin': DateTime.now(),
+          'sessions': FieldValue.arrayUnion([sessionEntry]),
+        }, SetOptions(merge: true));
+      } catch (e) {
+        debugPrint('Failed to update lastLogin/sessions: $e');
+      }
 
       if (mounted) {
         Navigator.of(context).pushReplacement(

@@ -5,6 +5,8 @@ import 'package:digify/mainpage_folder/insider_pages/fileverification_folder/ver
 import 'package:digify/mainpage_folder/insider_pages/profile_page.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:digify/mainpage_folder/setting%20pages/settings_page.dart';
+import 'package:digify/mainpage_folder/notification%20page/notifications_page.dart';
 
 class Mainpage extends ConsumerStatefulWidget {
   const Mainpage({super.key});
@@ -76,6 +78,30 @@ class _MainpageState extends ConsumerState<Mainpage> {
           ),
         ),
         centerTitle: false,
+        actions: index == 4
+            ? [
+                IconButton(
+                  icon: const Icon(Icons.notifications, color: Colors.white),
+                  tooltip: 'Notifications',
+                  onPressed: () {
+                    Navigator.of(context).push(
+                      MaterialPageRoute(
+                        builder: (_) => const NotificationsPage(),
+                      ),
+                    );
+                  },
+                ),
+                IconButton(
+                  icon: const Icon(Icons.settings, color: Colors.white),
+                  tooltip: 'Settings',
+                  onPressed: () {
+                    Navigator.of(context).push(
+                      MaterialPageRoute(builder: (_) => const SettingsPage()),
+                    );
+                  },
+                ),
+              ]
+            : [],
       ),
 
       // ✅ PageView keeps children without Scaffold

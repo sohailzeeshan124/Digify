@@ -6,6 +6,8 @@ class UserModel {
 
   final DateTime dateOfBirth;
 
+  String aboutme;
+
   String username; // fullname + random 4 digits at first
   String fullName;
   // String? phoneNumber;
@@ -41,12 +43,26 @@ class UserModel {
   final bool isGoogleDriveLinked;
   final String? googleDriveEmail; // to show connected account
 
+  // Usage metrics / history
+  int pdfCreatedCount;
+  List<DateTime> pdfCreatedAt;
+
+  int documentsSignedCount;
+  List<DateTime> documentsSignedAt;
+
+  int certificatesCreatedCount;
+  List<DateTime> certificatesCreatedAt;
+
+  int imagesToTextCount;
+  List<DateTime> imagesToTextAt;
+
   UserModel({
     required this.uid,
     required this.email,
     required this.username,
     required this.fullName,
     required this.dateOfBirth,
+    this.aboutme = '',
     //   this.phoneNumber,
     this.cnicFrontUrl,
     this.cnicBackUrl,
@@ -66,14 +82,40 @@ class UserModel {
     this.lastLogin,
     required this.isGoogleDriveLinked,
     this.googleDriveEmail,
+    this.pdfCreatedCount = 0,
+    this.pdfCreatedAt = const [],
+    this.documentsSignedCount = 0,
+    this.documentsSignedAt = const [],
+    this.certificatesCreatedCount = 0,
+    this.certificatesCreatedAt = const [],
+    this.imagesToTextCount = 0,
+    this.imagesToTextAt = const [],
   });
 
   factory UserModel.fromMap(Map<String, dynamic> data, String uid) {
+    List<DateTime> _parseDateList(dynamic raw) {
+      final List<DateTime> out = [];
+      if (raw is List) {
+        for (final item in raw) {
+          if (item is Timestamp) {
+            out.add(item.toDate());
+          } else if (item is DateTime) {
+            out.add(item);
+          } else if (item is String) {
+            final dt = DateTime.tryParse(item);
+            if (dt != null) out.add(dt);
+          }
+        }
+      }
+      return out;
+    }
+
     return UserModel(
       uid: uid,
       email: data['email'] ?? '',
       username: data['username'] ?? '',
       fullName: data['fullName'] ?? '',
+      aboutme: data['aboutme'] ?? '',
       dateOfBirth: DateTime.parse(data['dateOfBirth']),
       //     phoneNumber: data['phoneNumber'],
       cnicFrontUrl: data['cnicFrontUrl'],
@@ -96,6 +138,22 @@ class UserModel {
           : null,
       isGoogleDriveLinked: data['isGoogleDriveLinked'] ?? false,
       googleDriveEmail: data['googleDriveEmail'],
+      pdfCreatedCount: (data['pdfCreatedCount'] ?? 0) is int
+          ? data['pdfCreatedCount'] as int
+          : int.tryParse('${data['pdfCreatedCount'] ?? 0}') ?? 0,
+      pdfCreatedAt: _parseDateList(data['pdfCreatedAt']),
+      documentsSignedCount: (data['documentsSignedCount'] ?? 0) is int
+          ? data['documentsSignedCount'] as int
+          : int.tryParse('${data['documentsSignedCount'] ?? 0}') ?? 0,
+      documentsSignedAt: _parseDateList(data['documentsSignedAt']),
+      certificatesCreatedCount: (data['certificatesCreatedCount'] ?? 0) is int
+          ? data['certificatesCreatedCount'] as int
+          : int.tryParse('${data['certificatesCreatedCount'] ?? 0}') ?? 0,
+      certificatesCreatedAt: _parseDateList(data['certificatesCreatedAt']),
+      imagesToTextCount: (data['imagesToTextCount'] ?? 0) is int
+          ? data['imagesToTextCount'] as int
+          : int.tryParse('${data['imagesToTextCount'] ?? 0}') ?? 0,
+      imagesToTextAt: _parseDateList(data['imagesToTextAt']),
     );
   }
 
@@ -104,6 +162,7 @@ class UserModel {
       'email': email,
       'username': username,
       'fullName': fullName,
+      'aboutme': aboutme,
       //     'phoneNumber': phoneNumber,
       'dateOfBirth': dateOfBirth.toIso8601String(),
       'cnicFrontUrl': cnicFrontUrl,
@@ -124,6 +183,15 @@ class UserModel {
       'lastLogin': lastLogin,
       'isGoogleDriveLinked': isGoogleDriveLinked,
       'googleDriveEmail': googleDriveEmail,
+      // usage metrics
+      'pdfCreatedCount': pdfCreatedCount,
+      'pdfCreatedAt': pdfCreatedAt,
+      'documentsSignedCount': documentsSignedCount,
+      'documentsSignedAt': documentsSignedAt,
+      'certificatesCreatedCount': certificatesCreatedCount,
+      'certificatesCreatedAt': certificatesCreatedAt,
+      'imagesToTextCount': imagesToTextCount,
+      'imagesToTextAt': imagesToTextAt,
     };
   }
 }

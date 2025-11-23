@@ -5,6 +5,12 @@ import 'package:digify/viewmodels/user_viewmodel.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'dart:io';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:path_provider/path_provider.dart';
+import 'package:path/path.dart' as p;
+import 'package:flutter/foundation.dart';
+import 'dart:async';
 
 class ProfilePage extends StatefulWidget {
   const ProfilePage({super.key});
@@ -20,14 +26,41 @@ class _ProfilePageState extends State<ProfilePage> {
   UserModel? _userData;
   bool _isLoading = true;
 
+  // Subscription to user document snapshots for realtime updates
+  StreamSubscription<DocumentSnapshot<Map<String, dynamic>>>? _userDocSub;
+
   @override
   void initState() {
     super.initState();
     _loadUserData();
+    _subscribeToUserDoc();
+  }
+
+  void _subscribeToUserDoc() {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) return;
+
+    _userDocSub = FirebaseFirestore.instance
+        .collection('users')
+        .doc(user.uid)
+        .snapshots()
+        .listen((_) {
+      // Re-fetch the user via the viewmodel to keep mapping logic centralized.
+      _userViewModel.getUser(user.uid).then((userData) {
+        if (!mounted) return;
+        setState(() {
+          _userData = userData;
+          _aboutController.text = userData?.aboutme ?? '';
+        });
+      }).catchError((_) {
+        // Ignore errors from realtime updates
+      });
+    });
   }
 
   @override
   void dispose() {
+    _userDocSub?.cancel();
     _aboutController.dispose();
     super.dispose();
   }
@@ -48,7 +81,7 @@ class _ProfilePageState extends State<ProfilePage> {
       setState(() {
         _userData = userData;
         _isLoading = false;
-        _aboutController.text = userData?.status ?? '';
+        _aboutController.text = userData?.aboutme ?? '';
       });
     } catch (_) {
       if (!mounted) return;
@@ -62,11 +95,11 @@ class _ProfilePageState extends State<ProfilePage> {
     try {
       final user = FirebaseAuth.instance.currentUser;
       if (user != null && _userData != null) {
-        await _userViewModel.updateUser(user.uid, {'status': newAbout});
+        await _userViewModel.updateUser(user.uid, {'aboutme': newAbout});
 
         if (!mounted) return;
         setState(() {
-          _userData!.status = newAbout;
+          _userData!.aboutme = newAbout;
         });
 
         ScaffoldMessenger.of(context).showSnackBar(
@@ -303,15 +336,22 @@ class _ProfilePageState extends State<ProfilePage> {
                               ),
                               _buildInfoRow(
                                 Icons.calendar_month,
-                                'Date of Birth',
-                                _userData != null
-                                    ? _formatDate(_userData!.dateOfBirth)
-                                    : 'Not set',
+                                'Account Created',
+                                // Prefer stored createdAt in user model, fall back to FirebaseAuth metadata
+                                () {
+                                  final DateTime? createdAt =
+                                      _userData?.createdAt ??
+                                          FirebaseAuth.instance.currentUser
+                                              ?.metadata.creationTime;
+                                  return createdAt != null
+                                      ? _formatDate(createdAt)
+                                      : 'Not set';
+                                }(),
                               ),
                               _buildEditableInfoRow(
                                 Icons.description,
-                                'About',
-                                _userData?.status ?? 'Not set',
+                                'About Me',
+                                _userData?.aboutme ?? 'Not set',
                                 _showEditAboutDialog,
                               ),
                             ],
@@ -332,6 +372,10 @@ class _ProfilePageState extends State<ProfilePage> {
                                 'Signature',
                                 _userData?.signatureUrl,
                               ),
+                              _buildDocumentRow(
+                                'Stamp',
+                                _userData?.stampUrl,
+                              )
                             ],
                           ),
                         ],
@@ -511,7 +555,7 @@ class _ProfilePageState extends State<ProfilePage> {
                 ),
                 const SizedBox(height: 4),
                 Text(
-                  url != null ? 'View Document' : 'Not uploaded',
+                  url != null ? 'Download Document' : 'Not uploaded',
                   style: GoogleFonts.poppins(
                     fontSize: 16,
                     fontWeight: FontWeight.w500,
@@ -527,13 +571,127 @@ class _ProfilePageState extends State<ProfilePage> {
                 Icons.visibility,
                 color: AppColors.primaryGreen,
               ),
-              onPressed: () {
-                // TODO: Implement document viewer
-              },
+              onPressed: () => _confirmAndDownload(label),
             ),
         ],
       ),
     );
+  }
+
+  Future<void> _confirmAndDownload(String label) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Download Document'),
+        content: Text('Do you want to download "$label"?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(false),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(true),
+            child: const Text('Yes'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed != true) return;
+
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('No user signed in')),
+      );
+      return;
+    }
+
+    try {
+      final docSnap = await FirebaseFirestore.instance
+          .collection('users')
+          .doc(user.uid)
+          .get();
+      final data = docSnap.data();
+      if (data == null) {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('User data not found')),
+        );
+        return;
+      }
+
+      // map UI label to firestore field name
+      final Map<String, String> fieldMap = {
+        'CNIC Front': 'cnicFrontUrl',
+        'CNIC Back': 'cnicBackUrl',
+        'Signature': 'signatureUrl',
+        'Stamp': 'stampUrl',
+      };
+
+      final fieldName =
+          fieldMap[label] ?? label; // fallback if label matches field
+      final docUrl =
+          (data[fieldName] as String?) ?? (data['$fieldName']?.toString());
+
+      if (docUrl == null || docUrl.isEmpty) {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Document URL not available')),
+        );
+        return;
+      }
+
+      await _downloadFile(docUrl);
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Download failed: $e')),
+      );
+    }
+  }
+
+  Future<void> _downloadFile(String url) async {
+    try {
+      final uri = Uri.parse(url);
+      final filename =
+          uri.pathSegments.isNotEmpty ? uri.pathSegments.last : 'document.pdf';
+
+      Directory saveDir;
+      if (Platform.isAndroid) {
+        saveDir = Directory('/storage/emulated/0/Download');
+        if (!await saveDir.exists()) {
+          await saveDir.create(recursive: true);
+        }
+      } else {
+        saveDir = await getApplicationDocumentsDirectory();
+      }
+
+      final filePath = p.join(saveDir.path, filename);
+
+      final httpClient = HttpClient();
+      final request = await httpClient.getUrl(uri);
+      final response = await request.close();
+
+      if (response.statusCode != 200) {
+        throw Exception('HTTP ${response.statusCode}');
+      }
+
+      final bytes = await consolidateHttpClientResponseBytes(response);
+      final file = File(filePath);
+      await file.writeAsBytes(bytes);
+
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Downloaded to: $filePath')),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Failed to download file: $e')),
+      );
+    }
   }
 
   String _formatDate(DateTime date) {
@@ -541,5 +699,10 @@ class _ProfilePageState extends State<ProfilePage> {
     final month = date.month.toString().padLeft(2, '0');
     final year = date.year.toString();
     return '$day-$month-$year';
+  }
+
+  // Optional helper if you prefer a nullable formatter elsewhere
+  String _formatDateNullable(DateTime? date) {
+    return date == null ? 'Not set' : _formatDate(date);
   }
 }

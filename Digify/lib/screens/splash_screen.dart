@@ -8,6 +8,8 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:connectivity_plus/connectivity_plus.dart';
 import '../authentication/signin_page.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:digify/screens/complete_your_profile/contact_support.dart';
 
 class SplashScreen extends StatefulWidget {
   const SplashScreen({super.key});
@@ -82,6 +84,65 @@ class _SplashScreenState extends State<SplashScreen>
           try {
             final viewmodel = UserViewModel();
             final UserModel? userData = await viewmodel.getUser(user.uid);
+
+            // Check if the user is disabled/banned in firestore or in the user model
+            bool isDisabled = false;
+            if (userData != null) {
+              // adapt to your UserModel fields if different
+              isDisabled = (userData.isDisabled == true);
+            }
+
+            if (!isDisabled) {
+              // fallback to direct firestore check if model didn't indicate disabled
+              final docSnap = await FirebaseFirestore.instance
+                  .collection('users')
+                  .doc(user.uid)
+                  .get();
+              final docData = docSnap.data();
+              if (docData != null) {
+                isDisabled = (docData['isDisabled'] == true) ||
+                    (docData['disabled'] == true) ||
+                    (docData['banned'] == true) ||
+                    (docData['isBanned'] == true);
+              }
+            }
+
+            if (isDisabled) {
+              // Sign out and inform the user, then navigate to sign in
+              await FirebaseAuth.instance.signOut();
+              if (!mounted) return;
+              await showDialog(
+                context: context,
+                builder: (ctx) => AlertDialog(
+                  title: const Text('Account Disabled'),
+                  content: const Text(
+                      'This account has been disabled. Please contact support.'),
+                  actions: [
+                    TextButton(
+                      onPressed: () {
+                        Navigator.of(ctx).pop();
+                        // Navigate to Contact Support page
+                        Navigator.of(context).push(
+                          MaterialPageRoute(
+                            builder: (_) => const ContactSupportPage(),
+                          ),
+                        );
+                      },
+                      child: const Text('Contact Support'),
+                    ),
+                    TextButton(
+                      onPressed: () => Navigator.of(ctx).pop(),
+                      child: const Text('OK'),
+                    ),
+                  ],
+                ),
+              );
+              if (!mounted) return;
+              Navigator.of(context).pushReplacement(
+                MaterialPageRoute(builder: (_) => SignInScreen()),
+              );
+              return;
+            }
 
             if (userData == null) {
               Navigator.of(context).pushReplacement(

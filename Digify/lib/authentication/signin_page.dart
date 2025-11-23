@@ -1,6 +1,11 @@
+import 'dart:math';
+import 'dart:io';
+import 'package:cloud_firestore/cloud_firestore.dart';
+
 import 'package:digify/screens/complete_your_profile/profile_completion_screen.dart';
 import 'package:digify/mainpage_folder/mainpage.dart';
 import 'package:digify/modal_classes/user_data.dart';
+import 'package:digify/screens/complete_your_profile/contact_support.dart';
 import 'package:digify/utils/app_colors.dart';
 import 'package:digify/viewmodels/firebase_viewmodel.dart';
 import 'package:digify/viewmodels/user_viewmodel.dart';
@@ -61,6 +66,85 @@ class _SignInScreenState extends State<SignInScreen> {
 
         if (user != null) {
           UserModel? userfirestoreData = await userviewmodel.getUser(user.uid);
+
+          // Check user doc directly for any "banned/disabled" flag.
+          final docSnap = await FirebaseFirestore.instance
+              .collection('users')
+              .doc(user.uid)
+              .get();
+          final Map<String, dynamic>? docData = docSnap.data();
+          final bool isBanned = docData != null &&
+              ((docData['isDisabled'] == true) ||
+                  (docData['disabled'] == true) ||
+                  (docData['banned'] == true) ||
+                  (docData['isBanned'] == true));
+
+          if (isBanned) {
+            // Notify and force sign out so current user becomes null
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text('This account has been banned.'),
+                backgroundColor: Colors.red,
+              ),
+            );
+            await FirebaseAuth.instance.signOut();
+            setState(() {
+              _isLoading = false;
+            });
+            return;
+          }
+
+          // --- Update lastLogin and append session info (device, ip, loggedInAt) ---
+          try {
+            final userDocRef =
+                FirebaseFirestore.instance.collection('users').doc(user.uid);
+
+            // Device identifier (best-effort without extra package)
+            String deviceName = Platform.operatingSystem;
+            try {
+              // On some platforms Platform.operatingSystemVersion gives more info
+              deviceName =
+                  '${Platform.operatingSystem} ${Platform.operatingSystemVersion}';
+            } catch (_) {}
+
+            // Try to get a local IP address (best-effort). If it fails, leave empty.
+            String ipAddress = '';
+            try {
+              final interfaces = await NetworkInterface.list(
+                includeLoopback: false,
+                includeLinkLocal: true,
+              );
+              if (interfaces.isNotEmpty) {
+                for (final iface in interfaces) {
+                  for (final addr in iface.addresses) {
+                    if (addr.address.isNotEmpty && !addr.isLoopback) {
+                      ipAddress = addr.address;
+                      break;
+                    }
+                  }
+                  if (ipAddress.isNotEmpty) break;
+                }
+              }
+            } catch (_) {
+              ipAddress = '';
+            }
+
+            final sessionEntry = {
+              'device': deviceName,
+              'ip': ipAddress,
+              'loggedInAt': DateTime.now(),
+            };
+
+            // Use merge update to preserve existing fields
+            await userDocRef.set({
+              'lastLogin': DateTime.now(),
+              'sessions': FieldValue.arrayUnion([sessionEntry]),
+            }, SetOptions(merge: true));
+          } catch (e) {
+            // Silently ignore logging failures, but don't block sign in
+            debugPrint('Failed to update lastLogin/sessions: $e');
+          }
+          // ---------------------------------------------------------------------
 
           if (userfirestoreData == null) {
             Navigator.pushReplacement(
