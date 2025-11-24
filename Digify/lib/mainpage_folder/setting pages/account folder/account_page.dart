@@ -4,8 +4,11 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:image_cropper/image_cropper.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:digify/utils/app_colors.dart';
+import 'package:digify/cloudinary/cloudinary_repository.dart';
+import 'package:digify/viewmodels/user_viewmodel.dart';
 
 class AccountPage extends StatefulWidget {
   const AccountPage({super.key});
@@ -300,75 +303,137 @@ class _AccountPageState extends State<AccountPage> {
   Future<void> _pickProfilePicture() async {
     final user = FirebaseAuth.instance.currentUser;
     if (user == null) return;
-    final picked = await _picker.pickImage(
-        source: ImageSource.gallery, maxWidth: 1600, maxHeight: 1600);
-    if (picked == null) return;
-
-    final file = File(picked.path);
-    final confirm = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => Dialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        child: Padding(
-          padding: const EdgeInsets.all(20),
-          child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  children: [
-                    Icon(Icons.photo, color: AppColors.primaryGreen),
-                    const SizedBox(width: 8),
-                    Text(
-                      'Set Profile Picture',
-                      style: GoogleFonts.poppins(
-                          fontSize: 20,
-                          fontWeight: FontWeight.bold,
-                          color: AppColors.primaryGreen),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 12),
-                Center(
-                    child: Image.file(file,
-                        width: 120, height: 120, fit: BoxFit.cover)),
-                const SizedBox(height: 12),
-                const Text('Use this image as your profile picture?'),
-                const SizedBox(height: 12),
-                Row(mainAxisAlignment: MainAxisAlignment.end, children: [
-                  TextButton(
-                      onPressed: () => Navigator.of(ctx).pop(false),
-                      child: Text('Cancel',
-                          style: GoogleFonts.poppins(color: Colors.grey[600]))),
-                  const SizedBox(width: 8),
-                  ElevatedButton(
-                      onPressed: () => Navigator.of(ctx).pop(true),
-                      style: ElevatedButton.styleFrom(
-                          backgroundColor: AppColors.primaryGreen),
-                      child: Text('Use', style: GoogleFonts.poppins())),
-                ]),
-              ]),
-        ),
-      ),
-    );
-
-    if (confirm != true) return;
 
     try {
-      // NOTE: Upload to storage / get a public URL is recommended.
-      // For now we save a local path entry in Firestore (placeholder).
-      // Replace this with Firebase Storage upload and set photoURL on user for production.
-      await FirebaseFirestore.instance.collection('users').doc(user.uid).set({
-        'profilePicLocalPath': file.path,
-      }, SetOptions(merge: true));
+      final picked = await _picker.pickImage(
+          source: ImageSource.gallery, maxWidth: 1600, maxHeight: 1600);
+      if (picked == null) return;
+
+      final croppedFile = await ImageCropper().cropImage(
+        sourcePath: picked.path,
+        uiSettings: [
+          AndroidUiSettings(
+              toolbarTitle: 'Crop Image',
+              toolbarColor: AppColors.primaryGreen,
+              toolbarWidgetColor: Colors.white,
+              initAspectRatio: CropAspectRatioPreset.square,
+              lockAspectRatio: true,
+              aspectRatioPresets: [
+                CropAspectRatioPreset.square,
+              ]),
+          IOSUiSettings(
+            title: 'Crop Image',
+            aspectRatioLockEnabled: true,
+            rotateButtonsHidden: false,
+            resetButtonHidden: false,
+            aspectRatioPresets: [
+              CropAspectRatioPreset.square,
+            ],
+          ),
+        ],
+      );
+
+      if (croppedFile == null) return;
+
+      final file = File(croppedFile.path);
 
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Profile picture saved (local path)')));
+      final confirm = await showDialog<bool>(
+        context: context,
+        builder: (ctx) => Dialog(
+          shape:
+              RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+          child: Padding(
+            padding: const EdgeInsets.all(20),
+            child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Icon(Icons.photo, color: AppColors.primaryGreen),
+                      const SizedBox(width: 8),
+                      Text(
+                        'Set Profile Picture',
+                        style: GoogleFonts.poppins(
+                            fontSize: 20,
+                            fontWeight: FontWeight.bold,
+                            color: AppColors.primaryGreen),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 12),
+                  Center(
+                      child: ClipOval(
+                    child: Image.file(file,
+                        width: 120, height: 120, fit: BoxFit.cover),
+                  )),
+                  const SizedBox(height: 12),
+                  const Text('Use this image as your profile picture?'),
+                  const SizedBox(height: 12),
+                  Row(mainAxisAlignment: MainAxisAlignment.end, children: [
+                    TextButton(
+                        onPressed: () => Navigator.of(ctx).pop(false),
+                        child: Text('Cancel',
+                            style:
+                                GoogleFonts.poppins(color: Colors.grey[600]))),
+                    const SizedBox(width: 8),
+                    ElevatedButton(
+                        onPressed: () => Navigator.of(ctx).pop(true),
+                        style: ElevatedButton.styleFrom(
+                            backgroundColor: AppColors.primaryGreen),
+                        child: Text('Use',
+                            style: GoogleFonts.poppins(color: Colors.white))),
+                  ]),
+                ]),
+          ),
+        ),
+      );
+
+      if (confirm != true) return;
+
+      if (!mounted) return;
+      showDialog(
+        context: context,
+        barrierDismissible: false,
+        builder: (BuildContext context) {
+          return const Center(
+            child: CircularProgressIndicator(
+              color: AppColors.primaryGreen,
+            ),
+          );
+        },
+      );
+
+      final cloudinaryRepo = CloudinaryRepository();
+      final response = await cloudinaryRepo.uploadImage(file.path,
+          folder: "digify/profiles");
+
+      if (response != null && response.secureUrl != null) {
+        final userViewModel = UserViewModel();
+        await userViewModel
+            .updateUser(user.uid, {'profilePicUrl': response.secureUrl});
+
+        if (!mounted) return;
+        Navigator.of(context).pop(); // Dismiss loading
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+            content: Text('Profile picture updated successfully')));
+      } else {
+        if (!mounted) return;
+        Navigator.of(context).pop(); // Dismiss loading
+        ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Failed to upload profile picture')));
+      }
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Failed to save profile picture: $e')));
+      // Ensure loading dialog is dismissed if open
+      // This is a bit tricky without a key or state tracking, but for now we assume it might be open
+      // A safer way is to track loading state, but following the existing pattern:
+      Navigator.of(context)
+          .popUntil((route) => route.settings.name != null || route.isFirst);
+
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text('Error: $e')));
     }
   }
 

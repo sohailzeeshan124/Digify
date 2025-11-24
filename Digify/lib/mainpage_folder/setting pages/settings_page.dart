@@ -3,6 +3,7 @@ import 'package:digify/mainpage_folder/notification%20page/notifications_page.da
 import 'package:digify/mainpage_folder/setting%20pages/account%20folder/account_page.dart';
 import 'package:digify/mainpage_folder/setting%20pages/account%20folder/analytics_page.dart';
 import 'package:digify/mainpage_folder/setting%20pages/account%20folder/devices_connected_page.dart';
+import 'package:digify/mainpage_folder/setting%20pages/data%20&%20privacy/data&privacy.dart';
 import 'package:digify/screens/complete_your_profile/contact_support.dart';
 import 'package:digify/utils/app_colors.dart';
 import 'package:flutter/material.dart';
@@ -104,9 +105,7 @@ class SettingsPage extends StatelessWidget {
             _buildOptionRow(context,
                 icon: Icons.privacy_tip, label: 'Data & Privacy', onTap: () {
               Navigator.of(context).push(
-                MaterialPageRoute(
-                    builder: (_) =>
-                        const PlaceholderPage(title: 'Data & Privacy')),
+                MaterialPageRoute(builder: (_) => const DataPrivacyPage()),
               );
             }),
             _buildOptionRow(context, icon: Icons.devices, label: 'Devices',

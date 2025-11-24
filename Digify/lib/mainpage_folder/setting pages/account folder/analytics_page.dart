@@ -1,9 +1,11 @@
+import 'package:digify/utils/app_colors.dart';
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:digify/viewmodels/user_viewmodel.dart';
 import 'package:digify/modal_classes/user_data.dart';
 import 'package:intl/intl.dart';
 import 'package:fl_chart/fl_chart.dart';
+import 'package:google_fonts/google_fonts.dart';
 
 class AnalyticsPage extends StatefulWidget {
   const AnalyticsPage({super.key});
@@ -16,18 +18,23 @@ class _AnalyticsPageState extends State<AnalyticsPage> {
   final UserViewModel _vm = UserViewModel();
   UserModel? _user;
   bool _loading = true;
+  int _touchedIndex = -1;
 
-  final Map<String, String> _display = {
-    'pdf': 'PDFs Created',
-    'signed': 'Documents Signed',
-    'img2txt': 'Image→Text',
-    'cert': 'Certificates',
+  final Map<String, String> _categories = {
+    'pdf': 'PDFs',
+    'signed': 'Signed',
+    'img2txt': 'OCR',
+    'cert': 'Certs',
   };
 
   String _selectedCategory = 'pdf';
-  int _days = 30;
-  List<DateTime> _dates = [];
-  List<int> _counts = [];
+  int _days = 7;
+
+  // Chart data
+  List<String> _labels = [];
+  List<double> _values = [];
+  double _maxY = 0;
+  int _totalCount = 0;
 
   @override
   void initState() {
@@ -39,9 +46,7 @@ class _AnalyticsPageState extends State<AnalyticsPage> {
     setState(() => _loading = true);
     final user = FirebaseAuth.instance.currentUser;
     if (user == null) {
-      setState(() {
-        _loading = false;
-      });
+      setState(() => _loading = false);
       return;
     }
     try {
@@ -80,180 +85,391 @@ class _AnalyticsPageState extends State<AnalyticsPage> {
         .toList();
 
     final now = DateTime.now();
-    final start = DateTime(now.year, now.month, now.day)
-        .subtract(Duration(days: _days - 1));
+    _labels = [];
+    _values = [];
+    _totalCount = 0;
 
-    final buckets = <DateTime, int>{};
-    for (int i = 0; i < _days; i++) {
-      final d = start.add(Duration(days: i));
-      buckets[DateTime(d.year, d.month, d.day)] = 0;
+    if (_days == 365) {
+      // Monthly grouping for 1 year
+      List<DateTime> months = [];
+      for (int i = 11; i >= 0; i--) {
+        months.add(DateTime(now.year, now.month - i, 1));
+      }
+
+      _values = List.filled(12, 0.0);
+      _labels = months.map((d) => DateFormat('MMM').format(d)).toList();
+
+      for (var dt in raw) {
+        // Check if dt is within the last ~365 days (roughly)
+        // We match by month bucket
+        for (int i = 0; i < 12; i++) {
+          final m = months[i];
+          if (dt.year == m.year && dt.month == m.month) {
+            _values[i]++;
+            break;
+          }
+        }
+      }
+    } else {
+      // Daily grouping
+      final start = DateTime(now.year, now.month, now.day)
+          .subtract(Duration(days: _days - 1));
+
+      final buckets = <DateTime, int>{};
+      for (int i = 0; i < _days; i++) {
+        final d = start.add(Duration(days: i));
+        buckets[DateTime(d.year, d.month, d.day)] = 0;
+      }
+
+      for (final dt in raw) {
+        final key = DateTime(dt.year, dt.month, dt.day);
+        if (key.isBefore(start)) continue;
+        if (buckets.containsKey(key)) {
+          buckets[key] = buckets[key]! + 1;
+        }
+      }
+
+      final sortedKeys = buckets.keys.toList()..sort();
+      _labels = sortedKeys.map((d) {
+        if (_days == 7) return DateFormat('E').format(d);
+        return DateFormat('d/M').format(d);
+      }).toList();
+      _values = sortedKeys.map((d) => buckets[d]!.toDouble()).toList();
     }
 
-    for (final dt in raw) {
-      final key = DateTime(dt.year, dt.month, dt.day);
-      if (key.isBefore(start)) continue;
-      if (buckets.containsKey(key)) buckets[key] = buckets[key]! + 1;
-    }
+    _totalCount = _values.fold(0, (sum, v) => sum + v.toInt());
+    _maxY =
+        _values.isEmpty ? 5.0 : (_values.reduce((a, b) => a > b ? a : b) * 1.2);
+    if (_maxY < 5) _maxY = 5;
 
-    final labels = buckets.keys.toList()..sort();
-    final counts = labels.map((d) => buckets[d] ?? 0).toList();
-
-    setState(() {
-      _dates = labels;
-      _counts = counts;
-    });
+    setState(() {});
   }
 
-  Widget _buildControls() {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-      child: Row(
-        children: [
-          Expanded(
-            child: Wrap(
-              spacing: 8,
-              children: _display.keys.map((k) {
-                final selected = k == _selectedCategory;
-                return ChoiceChip(
-                  label: Text(_display[k]!),
-                  selected: selected,
-                  onSelected: (v) {
-                    setState(() => _selectedCategory = k);
-                    _rebuildChart();
-                  },
-                );
-              }).toList(),
-            ),
-          ),
-          const SizedBox(width: 8),
-          DropdownButton<int>(
-            value: _days,
-            items: const [
-              DropdownMenuItem(value: 7, child: Text('7d')),
-              DropdownMenuItem(value: 30, child: Text('30d')),
-              DropdownMenuItem(value: 90, child: Text('90d')),
-              DropdownMenuItem(value: 365, child: Text('1y')),
-            ],
-            onChanged: (v) {
-              if (v == null) return;
-              setState(() => _days = v);
+  Widget _buildCategorySelector() {
+    return Container(
+      height: 50,
+      margin: const EdgeInsets.symmetric(horizontal: 16),
+      child: ListView(
+        scrollDirection: Axis.horizontal,
+        children: _categories.entries.map((e) {
+          final isSelected = _selectedCategory == e.key;
+          return GestureDetector(
+            onTap: () {
+              setState(() {
+                _selectedCategory = e.key;
+                _touchedIndex = -1;
+              });
               _rebuildChart();
             },
+            child: AnimatedContainer(
+              duration: const Duration(milliseconds: 200),
+              margin: const EdgeInsets.only(right: 12),
+              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+              decoration: BoxDecoration(
+                color: isSelected
+                    ? AppColors.primaryGreen
+                    : AppColors.primaryGreen.withOpacity(0.1),
+                borderRadius: BorderRadius.circular(25),
+                boxShadow: isSelected
+                    ? [
+                        BoxShadow(
+                            color: AppColors.primaryGreen.withOpacity(0.4),
+                            blurRadius: 8,
+                            offset: const Offset(0, 4))
+                      ]
+                    : [],
+              ),
+              child: Center(
+                child: Text(
+                  e.value,
+                  style: GoogleFonts.poppins(
+                    color: isSelected ? Colors.white : AppColors.primaryGreen,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ),
+            ),
+          );
+        }).toList(),
+      ),
+    );
+  }
+
+  Widget _buildTimeRangeSelector() {
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 16),
+      padding: const EdgeInsets.all(4),
+      decoration: BoxDecoration(
+        color: Colors.grey[200],
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [7, 30, 90, 365].map((d) {
+          final isSelected = _days == d;
+          String label = '';
+          if (d == 7) label = '7 Days';
+          if (d == 30) label = '30 Days';
+          if (d == 90) label = '3 Months';
+          if (d == 365) label = '1 Year';
+
+          return Expanded(
+            child: GestureDetector(
+              onTap: () {
+                setState(() {
+                  _days = d;
+                  _touchedIndex = -1;
+                });
+                _rebuildChart();
+              },
+              child: AnimatedContainer(
+                duration: const Duration(milliseconds: 200),
+                padding: const EdgeInsets.symmetric(vertical: 8),
+                decoration: BoxDecoration(
+                  color: isSelected ? Colors.white : Colors.transparent,
+                  borderRadius: BorderRadius.circular(10),
+                  boxShadow: isSelected
+                      ? [
+                          BoxShadow(
+                              color: Colors.black.withOpacity(0.05),
+                              blurRadius: 4,
+                              offset: const Offset(0, 2))
+                        ]
+                      : [],
+                ),
+                child: Text(
+                  label,
+                  textAlign: TextAlign.center,
+                  style: GoogleFonts.poppins(
+                    fontSize: 12,
+                    fontWeight:
+                        isSelected ? FontWeight.w600 : FontWeight.normal,
+                    color: isSelected ? Colors.black : Colors.grey[600],
+                  ),
+                ),
+              ),
+            ),
+          );
+        }).toList(),
+      ),
+    );
+  }
+
+  Widget _buildSummaryCard() {
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 16),
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          colors: [
+            AppColors.primaryGreen,
+            AppColors.primaryGreen.withOpacity(0.8)
+          ],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        borderRadius: BorderRadius.circular(20),
+        boxShadow: [
+          BoxShadow(
+            color: AppColors.primaryGreen.withOpacity(0.3),
+            blurRadius: 10,
+            offset: const Offset(0, 5),
+          ),
+        ],
+      ),
+      child: Row(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: Colors.white.withOpacity(0.2),
+              shape: BoxShape.circle,
+            ),
+            child: const Icon(Icons.insights, color: Colors.white, size: 28),
+          ),
+          const SizedBox(width: 16),
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'Total ${_categories[_selectedCategory]}',
+                style: GoogleFonts.poppins(
+                  color: Colors.white.withOpacity(0.9),
+                  fontSize: 14,
+                ),
+              ),
+              Text(
+                '$_totalCount',
+                style: GoogleFonts.poppins(
+                  color: Colors.white,
+                  fontSize: 28,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ],
           ),
         ],
       ),
     );
   }
 
-  BarChartGroupData _makeGroup(int x, int value) {
+  BarChartGroupData _makeGroupData(int x, double y, {bool isTouched = false}) {
     return BarChartGroupData(
       x: x,
       barRods: [
         BarChartRodData(
-          toY: value.toDouble(),
-          width: 14,
-          borderRadius: BorderRadius.circular(4),
-          color: Theme.of(context).primaryColor,
-        )
+          toY: isTouched ? y + (y * 0.05) : y,
+          color: isTouched ? AppColors.primaryGreen : const Color(0xFF81C784),
+          width: _days == 7
+              ? 22
+              : _days == 30
+                  ? 8
+                  : _days == 90
+                      ? 4
+                      : 16,
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(6)),
+          backDrawRodData: BackgroundBarChartRodData(
+            show: true,
+            toY: _maxY,
+            color: Colors.grey[100],
+          ),
+        ),
       ],
+      showingTooltipIndicators: isTouched ? [0] : [],
     );
   }
 
   Widget _buildChart() {
-    if (_dates.isEmpty || _counts.isEmpty) {
-      return const SizedBox(
-        height: 200,
-        child: Center(child: Text('No data for selected period')),
+    if (_values.isEmpty) {
+      return SizedBox(
+        height: 300,
+        child: Center(
+            child: Text('No data available', style: GoogleFonts.poppins())),
       );
     }
 
-    final maxY = (_counts.isEmpty
-        ? 1.0
-        : (_counts.reduce((a, b) => a > b ? a : b).toDouble() + 1.0));
-
-    final interval = (maxY / 4).clamp(1.0, maxY);
-
-    return SizedBox(
-      height: 260,
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 12.0),
-        child: BarChart(
-          BarChartData(
-            alignment: BarChartAlignment.spaceBetween,
-            maxY: maxY,
-            titlesData: FlTitlesData(
-              leftTitles: AxisTitles(
-                sideTitles: SideTitles(
-                  showTitles: true,
-                  getTitlesWidget: (value, meta) {
-                    return Text(value.toInt().toString(),
-                        style: const TextStyle(fontSize: 10));
-                  },
-                  interval: interval,
-                ),
-              ),
-              bottomTitles: AxisTitles(
-                sideTitles: SideTitles(
-                  showTitles: true,
-                  reservedSize: 36,
-                  getTitlesWidget: (value, meta) {
-                    final idx = value.toInt();
-                    if (idx < 0 || idx >= _dates.length) {
-                      return const SizedBox();
-                    }
-                    final dt = _dates[idx];
-                    final label = (_days <= 30)
-                        ? DateFormat('dd MMM').format(dt)
-                        : DateFormat('MMM yy').format(dt);
-                    return Text(label, style: const TextStyle(fontSize: 10));
-                  },
-                  interval: 1,
-                ),
-              ),
-              rightTitles:
-                  const AxisTitles(sideTitles: SideTitles(showTitles: false)),
-              topTitles:
-                  const AxisTitles(sideTitles: SideTitles(showTitles: false)),
-            ),
-            gridData: FlGridData(
-                show: true,
-                drawHorizontalLine: true,
-                horizontalInterval: interval),
-            barGroups:
-                List.generate(_counts.length, (i) => _makeGroup(i, _counts[i])),
-            borderData: FlBorderData(show: false),
+    return Container(
+      height: 320,
+      margin: const EdgeInsets.all(16),
+      padding: const EdgeInsets.fromLTRB(16, 24, 16, 0),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(24),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.grey.withOpacity(0.1),
+            blurRadius: 10,
+            spreadRadius: 5,
           ),
-        ),
+        ],
       ),
-    );
-  }
+      child: BarChart(
+        BarChartData(
+          barTouchData: BarTouchData(
+            touchTooltipData: BarTouchTooltipData(
+              getTooltipColor: (_) => AppColors.primaryGreen,
+              tooltipPadding: const EdgeInsets.all(8),
+              tooltipMargin: 8,
+              getTooltipItem: (group, groupIndex, rod, rodIndex) {
+                return BarTooltipItem(
+                  '${rod.toY.toInt()}\n',
+                  const TextStyle(
+                    color: Colors.white,
+                    fontWeight: FontWeight.bold,
+                  ),
+                  children: <TextSpan>[
+                    TextSpan(
+                      text: _labels[group.x],
+                      style: const TextStyle(
+                        color: Colors.white70,
+                        fontSize: 10,
+                        fontWeight: FontWeight.normal,
+                      ),
+                    ),
+                  ],
+                );
+              },
+            ),
+            touchCallback: (FlTouchEvent event, barTouchResponse) {
+              setState(() {
+                if (!event.isInterestedForInteractions ||
+                    barTouchResponse == null ||
+                    barTouchResponse.spot == null) {
+                  _touchedIndex = -1;
+                  return;
+                }
+                _touchedIndex = barTouchResponse.spot!.touchedBarGroupIndex;
+              });
+            },
+          ),
+          titlesData: FlTitlesData(
+            show: true,
+            rightTitles:
+                const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+            topTitles:
+                const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+            bottomTitles: AxisTitles(
+              sideTitles: SideTitles(
+                showTitles: true,
+                getTitlesWidget: (double value, TitleMeta meta) {
+                  final index = value.toInt();
+                  if (index < 0 || index >= _labels.length) {
+                    return const SizedBox();
+                  }
 
-  Widget _buildEventList() {
-    if (_user == null) return const SizedBox();
-    final raw = _getDatesForCategory(_user!, _selectedCategory)
-        .whereType<DateTime>()
-        .toList()
-      ..sort((a, b) => b.compareTo(a));
+                  // Smart label showing logic
+                  if (_days == 30 && index % 5 != 0) return const SizedBox();
+                  if (_days == 90 && index % 15 != 0) return const SizedBox();
 
-    if (raw.isEmpty) {
-      return const Padding(
-        padding: EdgeInsets.all(16.0),
-        child: Text('No events recorded for this category.'),
-      );
-    }
-
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 12.0),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: raw.map((dt) {
-          return ListTile(
-            dense: true,
-            leading: const Icon(Icons.circle, size: 10),
-            title: Text(DateFormat('dd MMM yyyy • hh:mm a').format(dt)),
-            subtitle: Text('Event in ${_display[_selectedCategory]}'),
-          );
-        }).toList(),
+                  return Padding(
+                    padding: const EdgeInsets.only(top: 8.0),
+                    child: Text(
+                      _labels[index],
+                      style: GoogleFonts.poppins(
+                        color: Colors.grey[600],
+                        fontSize: 10,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                  );
+                },
+                reservedSize: 30,
+              ),
+            ),
+            leftTitles: AxisTitles(
+              sideTitles: SideTitles(
+                showTitles: true,
+                reservedSize: 28,
+                interval: _maxY / 4 > 0 ? _maxY / 4 : 1,
+                getTitlesWidget: (value, meta) {
+                  if (value == 0) return const SizedBox();
+                  return Text(
+                    value.toInt().toString(),
+                    style: GoogleFonts.poppins(
+                      color: Colors.grey[400],
+                      fontSize: 10,
+                    ),
+                  );
+                },
+              ),
+            ),
+          ),
+          borderData: FlBorderData(show: false),
+          barGroups: List.generate(_values.length, (i) {
+            return _makeGroupData(i, _values[i], isTouched: i == _touchedIndex);
+          }),
+          gridData: FlGridData(
+            show: true,
+            drawVerticalLine: false,
+            horizontalInterval: _maxY / 4 > 0 ? _maxY / 4 : 1,
+            getDrawingHorizontalLine: (value) => FlLine(
+              color: Colors.grey[100],
+              strokeWidth: 1,
+            ),
+          ),
+          alignment: BarChartAlignment.spaceAround,
+          maxY: _maxY,
+        ),
       ),
     );
   }
@@ -261,50 +477,36 @@ class _AnalyticsPageState extends State<AnalyticsPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: Colors.grey[50],
       appBar: AppBar(
-        title: const Text('Analytics'),
-        backgroundColor: const Color(0xFF274A31),
+        elevation: 0,
+        title: Text(
+          'Analytics',
+          style: GoogleFonts.poppins(
+            color: Colors.white,
+            fontWeight: FontWeight.bold,
+            fontSize: 20,
+          ),
+        ),
+        backgroundColor: AppColors.primaryGreen,
+        iconTheme: const IconThemeData(color: Colors.white),
       ),
       body: _loading
-          ? const Center(child: CircularProgressIndicator())
+          ? Center(
+              child: CircularProgressIndicator(color: AppColors.primaryGreen))
           : RefreshIndicator(
               onRefresh: _loadUser,
+              color: AppColors.primaryGreen,
               child: ListView(
+                padding: const EdgeInsets.symmetric(vertical: 20),
                 children: [
-                  const SizedBox(height: 12),
-                  _buildControls(),
+                  _buildCategorySelector(),
+                  const SizedBox(height: 24),
+                  _buildSummaryCard(),
+                  const SizedBox(height: 24),
+                  _buildTimeRangeSelector(),
                   const SizedBox(height: 8),
-                  Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 12.0),
-                    child: Card(
-                      elevation: 2,
-                      shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12)),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Padding(
-                            padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
-                            child: Text(
-                              _display[_selectedCategory] ?? '',
-                              style: const TextStyle(
-                                  fontSize: 16, fontWeight: FontWeight.bold),
-                            ),
-                          ),
-                          _buildChart(),
-                          const SizedBox(height: 8),
-                        ],
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-                  Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 12.0),
-                    child: Text('Events',
-                        style: Theme.of(context).textTheme.titleMedium),
-                  ),
-                  _buildEventList(),
-                  const SizedBox(height: 32),
+                  _buildChart(),
                 ],
               ),
             ),

@@ -68,6 +68,13 @@ class _ProfilePageState extends State<ProfilePage> {
   Future<void> _loadUserData() async {
     final user = FirebaseAuth.instance.currentUser;
 
+    // ScaffoldMessenger.of(context).showSnackBar(
+    //   SnackBar(
+    //     content: Text(user!.uid),
+    //     backgroundColor: Colors.green,
+    //   ),
+    // );
+
     if (user == null) {
       setState(() {
         _isLoading = false;
@@ -81,6 +88,7 @@ class _ProfilePageState extends State<ProfilePage> {
       setState(() {
         _userData = userData;
         _isLoading = false;
+
         _aboutController.text = userData?.aboutme ?? '';
       });
     } catch (_) {
@@ -95,7 +103,9 @@ class _ProfilePageState extends State<ProfilePage> {
     try {
       final user = FirebaseAuth.instance.currentUser;
       if (user != null && _userData != null) {
-        await _userViewModel.updateUser(user.uid, {'aboutme': newAbout});
+        await FirebaseFirestore.instance.collection('users').doc(user.uid).set({
+          'aboutme': newAbout,
+        }, SetOptions(merge: true));
 
         if (!mounted) return;
         setState(() {

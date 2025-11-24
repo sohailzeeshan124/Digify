@@ -1,11 +1,9 @@
-import 'dart:math';
 import 'dart:io';
 import 'package:cloud_firestore/cloud_firestore.dart';
 
 import 'package:digify/screens/complete_your_profile/profile_completion_screen.dart';
 import 'package:digify/mainpage_folder/mainpage.dart';
 import 'package:digify/modal_classes/user_data.dart';
-import 'package:digify/screens/complete_your_profile/contact_support.dart';
 import 'package:digify/utils/app_colors.dart';
 import 'package:digify/viewmodels/firebase_viewmodel.dart';
 import 'package:digify/viewmodels/user_viewmodel.dart';

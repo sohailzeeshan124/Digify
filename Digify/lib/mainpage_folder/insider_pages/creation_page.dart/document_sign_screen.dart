@@ -548,7 +548,7 @@ class _DocumentSignScreenState extends State<DocumentSignScreen> {
                       children: [
                         const Text('Color'),
                         IconButton(
-                          icon: Icon(Icons.circle, color: Colors.black),
+                          icon: const Icon(Icons.circle, color: Colors.black),
                           onPressed: () {
                             setState(() {
                               textColor = Colors.black;
@@ -556,7 +556,7 @@ class _DocumentSignScreenState extends State<DocumentSignScreen> {
                           },
                         ),
                         IconButton(
-                          icon: Icon(Icons.circle, color: Colors.red),
+                          icon: const Icon(Icons.circle, color: Colors.red),
                           onPressed: () {
                             setState(() {
                               textColor = Colors.red;
@@ -564,7 +564,7 @@ class _DocumentSignScreenState extends State<DocumentSignScreen> {
                           },
                         ),
                         IconButton(
-                          icon: Icon(Icons.circle, color: Colors.blue),
+                          icon: const Icon(Icons.circle, color: Colors.blue),
                           onPressed: () {
                             setState(() {
                               textColor = Colors.blue;
@@ -734,7 +734,7 @@ class _SignatureOverlay extends StatelessWidget {
             bottom: -16,
             child: GestureDetector(
               onPanUpdate: (details) => onResize(details.delta),
-              child: Icon(Icons.open_with, color: Colors.blue, size: 28),
+              child: const Icon(Icons.open_with, color: Colors.blue, size: 28),
             ),
           ),
           // Rotate handle (loop arrow) above center
@@ -742,7 +742,8 @@ class _SignatureOverlay extends StatelessWidget {
             top: -32,
             child: GestureDetector(
               onPanUpdate: (details) => onRotate(details.delta),
-              child: Icon(Icons.rotate_right, color: Colors.orange, size: 28),
+              child: const Icon(Icons.rotate_right,
+                  color: Colors.orange, size: 28),
             ),
           ),
         ],

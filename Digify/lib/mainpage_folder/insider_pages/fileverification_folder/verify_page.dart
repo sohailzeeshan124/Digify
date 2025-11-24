@@ -12,6 +12,7 @@ class VerifyPage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: const Color(0xFFF2F4F3),
       body: ListView(
         padding: const EdgeInsets.all(16.0),
         children: [
@@ -29,19 +30,6 @@ class VerifyPage extends StatelessWidget {
               );
             },
           ),
-          // const SizedBox(height: 16),
-          // _buildOptionCard(
-          //   icon: Icons.qr_code,
-          //   title: 'Generate QR Code',
-          //   subtitle: 'Generate QR code for document verification',
-          //   onTap: () {
-          //     Navigator.push(
-          //       context,
-          //       MaterialPageRoute(
-          //           builder: (context) => const QRGeneratorScreen()),
-          //     );
-          //   },
-          // ),
           const SizedBox(height: 16),
           _buildOptionCard(
             icon: Icons.document_scanner,
@@ -68,14 +56,16 @@ class VerifyPage extends StatelessWidget {
             },
           ),
           const SizedBox(height: 24),
-          _buildSectionHeader("Certificates"),
-          const SizedBox(height: 12),
           _buildOptionCard(
-            icon: Icons.verified_user,
-            title: 'Verify Certificate',
-            subtitle: 'Verify the authenticity of a certificate',
+            icon: Icons.qr_code_scanner,
+            title: 'Scan QR Code',
+            subtitle: 'Scan QR code to verify certificate authenticity',
             onTap: () {
-              // TODO: Implement certificate verification
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                    builder: (context) => const QRScannerScreen()),
+              );
             },
           ),
         ],
@@ -112,6 +102,7 @@ class VerifyPage extends StatelessWidget {
       onTap: onTap,
       borderRadius: BorderRadius.circular(16),
       child: Card(
+        color: const Color(0xFFF2F4F3),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         elevation: 3,
         child: Padding(

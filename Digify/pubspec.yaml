@@ -82,6 +82,10 @@ dependencies:
   app_settings: ^6.1.1
   firebase_messaging: ^15.2.10
   fl_chart: 1.1.1
+  device_info_plus: ^11.5.0
+  package_info_plus: ^9.0.0
+  geolocator: ^14.0.1
+  image_cropper: ^8.0.2
 
 dev_dependencies:
   flutter_test:

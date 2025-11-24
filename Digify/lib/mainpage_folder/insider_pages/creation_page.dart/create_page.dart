@@ -1,3 +1,4 @@
+import 'package:digify/mainpage_folder/insider_pages/creation_page.dart/certification_page/certificate_type.dart';
 import 'package:digify/mainpage_folder/insider_pages/creation_page.dart/create_pdf_page.dart';
 import 'package:digify/mainpage_folder/insider_pages/creation_page.dart/document_sign_screen.dart';
 import 'package:digify/mainpage_folder/insider_pages/creation_page.dart/image_to_doc_page.dart';
@@ -10,6 +11,7 @@ class CreatePage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: const Color(0xFFF2F4F3),
       body: Padding(
         padding: const EdgeInsets.all(16.0),
         child: ListView(
@@ -56,7 +58,7 @@ class CreatePage extends StatelessWidget {
                 } else {
                   // User canceled the picker
                   ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(content: Text("No PDF selected.")),
+                    const SnackBar(content: Text("No PDF selected.")),
                   );
                 }
               },
@@ -67,7 +69,12 @@ class CreatePage extends StatelessWidget {
               title: 'Create Certificate',
               subtitle: 'Design and issue certificates',
               onTap: () {
-                // Navigate to Certificate Creator
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => const CertificateTypeScreen(),
+                  ),
+                );
               },
             ),
             const SizedBox(height: 16),
@@ -98,6 +105,7 @@ class CreatePage extends StatelessWidget {
   }) {
     return Card(
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      color: const Color(0xFFF2F4F3),
       elevation: 4,
       child: ListTile(
         contentPadding: const EdgeInsets.all(16),
