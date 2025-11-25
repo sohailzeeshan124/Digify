@@ -23,6 +23,7 @@ class _ArchivePageState extends State<ArchivePage> {
   List<DocumentModel> _documents = [];
   List<FileSystemEntity> _pdfFiles = [];
   List<FileSystemEntity> _img2txtFiles = [];
+  List<FileSystemEntity> _certificateFiles = [];
   bool _isLoading = true;
 
   final Map<String, String> _categories = {
@@ -114,6 +115,37 @@ class _ArchivePageState extends State<ArchivePage> {
     }
   }
 
+  Future<void> _loadCertificateFiles() async {
+    setState(() => _isLoading = true);
+    try {
+      final directory =
+          Directory('/storage/emulated/0/Documents/generated_certificate');
+      if (await directory.exists()) {
+        final files = directory.listSync();
+
+        // Sort by modification time, newest first
+        files.sort(
+            (a, b) => b.statSync().modified.compareTo(a.statSync().modified));
+
+        setState(() {
+          _certificateFiles = files;
+          _isLoading = false;
+        });
+      } else {
+        setState(() {
+          _certificateFiles = [];
+          _isLoading = false;
+        });
+      }
+    } catch (e) {
+      debugPrint('Error loading Certificate files: $e');
+      setState(() {
+        _certificateFiles = [];
+        _isLoading = false;
+      });
+    }
+  }
+
   void _showPdfViewer(String pdfUrl) {
     Navigator.push(
       context,
@@ -191,6 +223,8 @@ class _ArchivePageState extends State<ArchivePage> {
                 _loadDocuments();
               } else if (e.key == 'img2txt') {
                 _loadImg2TxtFiles();
+              } else if (e.key == 'certs') {
+                _loadCertificateFiles();
               }
             },
             child: AnimatedContainer(
@@ -694,24 +728,189 @@ class _ArchivePageState extends State<ArchivePage> {
                                       );
                                     },
                                   ))
-                        : Center(
-                            child: Column(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              children: [
-                                Icon(Icons.construction,
-                                    size: 64, color: Colors.grey[400]),
-                                const SizedBox(height: 16),
-                                Text(
-                                  '${_categories[_selectedCategory]} coming soon',
-                                  style: GoogleFonts.poppins(
-                                    fontSize: 18,
-                                    color: Colors.grey[600],
-                                    fontWeight: FontWeight.w500,
-                                  ),
+                        : _selectedCategory == 'certs'
+                            ? (_isLoading
+                                ? const Center(
+                                    child: CircularProgressIndicator())
+                                : _certificateFiles.isEmpty
+                                    ? const Center(
+                                        child: Text(
+                                          "No Certificates found",
+                                          style: TextStyle(fontSize: 18),
+                                        ),
+                                      )
+                                    : ListView.builder(
+                                        padding: const EdgeInsets.all(16),
+                                        itemCount: _certificateFiles.length,
+                                        itemBuilder: (context, index) {
+                                          final file = _certificateFiles[index];
+                                          final fileName =
+                                              file.path.split('/').last;
+                                          final stat = file.statSync();
+                                          final extension = fileName
+                                              .split('.')
+                                              .last
+                                              .toLowerCase();
+
+                                          IconData iconData;
+                                          Color iconColor;
+
+                                          switch (extension) {
+                                            case 'pdf':
+                                              iconData = Icons.picture_as_pdf;
+                                              iconColor = Colors.red;
+                                              break;
+                                            case 'jpg':
+                                            case 'jpeg':
+                                            case 'png':
+                                              iconData = Icons.image;
+                                              iconColor = Colors.purple;
+                                              break;
+                                            default:
+                                              iconData =
+                                                  Icons.insert_drive_file;
+                                              iconColor = Colors.grey;
+                                          }
+
+                                          return Padding(
+                                            padding: const EdgeInsets.only(
+                                                bottom: 16),
+                                            child: GestureDetector(
+                                              onTap: () {
+                                                if (extension == 'pdf') {
+                                                  _showPdfViewer(file.path);
+                                                } else {
+                                                  OpenFilex.open(file.path);
+                                                }
+                                              },
+                                              child: Card(
+                                                elevation: 4,
+                                                color: const Color(0xFFF2F4F3),
+                                                shape: RoundedRectangleBorder(
+                                                  borderRadius:
+                                                      BorderRadius.circular(12),
+                                                ),
+                                                child: Container(
+                                                  height: 120,
+                                                  child: Row(
+                                                    children: [
+                                                      // Icon Section
+                                                      Container(
+                                                        width: 100,
+                                                        decoration:
+                                                            BoxDecoration(
+                                                          color: iconColor
+                                                              .withOpacity(0.1),
+                                                          borderRadius:
+                                                              const BorderRadius
+                                                                  .horizontal(
+                                                            left:
+                                                                Radius.circular(
+                                                                    12),
+                                                          ),
+                                                        ),
+                                                        child: Center(
+                                                          child: Icon(
+                                                            iconData,
+                                                            size: 48,
+                                                            color: iconColor,
+                                                          ),
+                                                        ),
+                                                      ),
+                                                      // Document Info Section
+                                                      Expanded(
+                                                        child: Padding(
+                                                          padding:
+                                                              const EdgeInsets
+                                                                  .all(16),
+                                                          child: Column(
+                                                            crossAxisAlignment:
+                                                                CrossAxisAlignment
+                                                                    .start,
+                                                            mainAxisAlignment:
+                                                                MainAxisAlignment
+                                                                    .center,
+                                                            children: [
+                                                              Text(
+                                                                fileName,
+                                                                style:
+                                                                    const TextStyle(
+                                                                  fontSize: 18,
+                                                                  fontWeight:
+                                                                      FontWeight
+                                                                          .bold,
+                                                                ),
+                                                                maxLines: 1,
+                                                                overflow:
+                                                                    TextOverflow
+                                                                        .ellipsis,
+                                                              ),
+                                                              const SizedBox(
+                                                                  height: 8),
+                                                              Text(
+                                                                'Modified: ${DateFormat('MMM dd, yyyy').format(stat.modified)}',
+                                                                style:
+                                                                    TextStyle(
+                                                                  fontSize: 14,
+                                                                  color: Colors
+                                                                          .grey[
+                                                                      600],
+                                                                ),
+                                                              ),
+                                                              const SizedBox(
+                                                                  height: 4),
+                                                              Text(
+                                                                'Size: ${(stat.size / 1024).toStringAsFixed(1)} KB',
+                                                                style:
+                                                                    TextStyle(
+                                                                  fontSize: 14,
+                                                                  color: Colors
+                                                                          .grey[
+                                                                      600],
+                                                                ),
+                                                              ),
+                                                            ],
+                                                          ),
+                                                        ),
+                                                      ),
+                                                      // Arrow Icon
+                                                      const Padding(
+                                                        padding:
+                                                            EdgeInsets.only(
+                                                                right: 16),
+                                                        child: Icon(
+                                                          Icons
+                                                              .arrow_forward_ios,
+                                                          color: AppColors
+                                                              .primaryGreen,
+                                                        ),
+                                                      ),
+                                                    ],
+                                                  ),
+                                                ),
+                                              ),
+                                            ),
+                                          );
+                                        },
+                                      ))
+                            : Center(
+                                child: Column(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  children: [
+                                    Icon(Icons.construction,
+                                        size: 64, color: Colors.grey[400]),
+                                    const SizedBox(height: 16),
+                                    Text(
+                                      '${_categories[_selectedCategory]} coming soon',
+                                      style: GoogleFonts.poppins(
+                                        fontSize: 18,
+                                        color: Colors.grey[600],
+                                        fontWeight: FontWeight.w500,
+                                      ),
+                                    ),
+                                  ],
                                 ),
-                              ],
-                            ),
-                          ),
+                              ),
           ),
         ],
       ),

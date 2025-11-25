@@ -28,6 +28,7 @@ class CertificateModel {
   final String uploadedBy;
   final DateTime createdAt;
   final String pdfUrl;
+  final String localpdfpath;
   final List<SignerInfo> signedBy;
 
   CertificateModel({
@@ -36,6 +37,7 @@ class CertificateModel {
     required this.uploadedBy,
     required this.createdAt,
     required this.pdfUrl,
+    required this.localpdfpath,
     required this.signedBy,
   });
 
@@ -45,6 +47,7 @@ class CertificateModel {
         'uploadedBy': uploadedBy,
         'createdAt': createdAt.toIso8601String(),
         'pdfUrl': pdfUrl,
+        'localpdfpath': localpdfpath,
         'signedBy': signedBy.map((s) => s.toMap()).toList(),
       };
 
@@ -55,6 +58,7 @@ class CertificateModel {
         uploadedBy: map['uploadedBy'],
         createdAt: DateTime.parse(map['createdAt']),
         pdfUrl: map['pdfUrl'],
+        localpdfpath: map['localpdfpath'],
         signedBy: List<SignerInfo>.from(
             (map['signedBy'] as List).map((e) => SignerInfo.fromMap(e))),
       );

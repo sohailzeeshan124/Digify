@@ -12,6 +12,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:device_info_plus/device_info_plus.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import 'package:geolocator/geolocator.dart';
+import 'package:digify/viewmodels/user_viewmodel.dart';
 
 class WorkingPhotocertificate extends StatefulWidget {
   const WorkingPhotocertificate({super.key});
@@ -105,6 +106,20 @@ class _WorkingPhotocertificateState extends State<WorkingPhotocertificate> {
       // Generate a unique ID for the certificate.
       final certDocId = DateTime.now().millisecondsSinceEpoch.toString();
 
+      // Fetch App Name
+      final packageInfo = await PackageInfo.fromPlatform();
+      final appName = packageInfo.appName;
+
+      // Fetch Signature Path
+      String? signaturePath;
+      try {
+        final userViewModel = UserViewModel();
+        final userDataModel = await userViewModel.getUser(user.uid);
+        signaturePath = userDataModel?.signatureLocalPath;
+      } catch (e) {
+        print('Error fetching signature path: $e');
+      }
+
       // 2. Generate PDF
       print('Generating PDF...');
       final pdfBytes = await PdfGeneratorService().generateReport(
@@ -116,6 +131,8 @@ class _WorkingPhotocertificateState extends State<WorkingPhotocertificate> {
         deviceData: deviceData,
         locationData: locationData,
         certificateId: certDocId,
+        signaturePath: signaturePath,
+        appName: appName,
       );
 
       // 3. Upload PDF to Cloudinary
@@ -123,6 +140,15 @@ class _WorkingPhotocertificateState extends State<WorkingPhotocertificate> {
       final tempDir = await Directory.systemTemp.createTemp();
       final tempFile = File('${tempDir.path}/certificate_$certDocId.pdf');
       await tempFile.writeAsBytes(pdfBytes);
+
+      // Save locally
+      final localDir =
+          Directory('/storage/emulated/0/Documents/generated_certificate');
+      if (!await localDir.exists()) {
+        await localDir.create(recursive: true);
+      }
+      final localFile = File('${localDir.path}/certificate_$certDocId.pdf');
+      await localFile.writeAsBytes(pdfBytes);
 
       final cloudinaryRepo = CloudinaryRepository();
       final response = await cloudinaryRepo.uploadFile(tempFile.path,
@@ -140,6 +166,7 @@ class _WorkingPhotocertificateState extends State<WorkingPhotocertificate> {
         uploadedBy: user.displayName ?? 'Unknown',
         createdAt: DateTime.now(),
         pdfUrl: response.secureUrl!,
+        localpdfpath: localFile.path,
         signedBy: [
           SignerInfo(
             Name: _nameController.text,

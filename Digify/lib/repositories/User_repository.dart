@@ -45,4 +45,54 @@ class UserRepository {
 
     return username;
   }
+
+  Future<List<UserModel>> getUsers(List<String> uids) async {
+    if (uids.isEmpty) return [];
+    // Firestore 'where in' supports up to 10 items. For more, we need to batch or loop.
+    // For simplicity, assuming < 10 friends for now or we can split.
+    // Actually, getting by document ID with whereIn is FieldPath.documentId
+
+    List<UserModel> users = [];
+
+    // Split into chunks of 10
+    for (var i = 0; i < uids.length; i += 10) {
+      var end = (i + 10 < uids.length) ? i + 10 : uids.length;
+      var chunk = uids.sublist(i, end);
+
+      final query = await _firestore
+          .collection(collection)
+          .where(FieldPath.documentId, whereIn: chunk)
+          .get();
+
+      users.addAll(
+          query.docs.map((doc) => UserModel.fromMap(doc.data(), doc.id)));
+    }
+
+    return users;
+  }
+
+  Future<UserModel?> getUserByUsername(String username) async {
+    final query = await _firestore
+        .collection(collection)
+        .where('username', isEqualTo: username)
+        .limit(1)
+        .get();
+
+    if (query.docs.isNotEmpty) {
+      return UserModel.fromMap(query.docs.first.data(), query.docs.first.id);
+    }
+    return null;
+  }
+
+  Future<void> addFriend(String currentUserId, String friendId) async {
+    // Add friend to current user's friend list
+    await _firestore.collection(collection).doc(currentUserId).update({
+      'friends': FieldValue.arrayUnion([friendId])
+    });
+
+    // Add current user to friend's friend list (Two-way friendship)
+    await _firestore.collection(collection).doc(friendId).update({
+      'friends': FieldValue.arrayUnion([currentUserId])
+    });
+  }
 }

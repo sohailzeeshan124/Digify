@@ -19,4 +19,16 @@ class UserViewModel {
   Future<void> deleteUser(String uid) async {
     await _repo.deleteUser(uid);
   }
+
+  Future<List<UserModel>> getUsers(List<String> uids) async {
+    return await _repo.getUsers(uids);
+  }
+
+  Future<UserModel?> getUserByUsername(String username) async {
+    return await _repo.getUserByUsername(username);
+  }
+
+  Future<void> addFriend(String currentUserId, String friendId) async {
+    await _repo.addFriend(currentUserId, friendId);
+  }
 }

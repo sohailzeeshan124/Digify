@@ -5,6 +5,9 @@ import 'package:flutter/services.dart';
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 import 'package:printing/printing.dart';
+import 'package:http/http.dart' as http;
+import 'package:image/image.dart' as img;
+import 'package:intl/intl.dart';
 
 class PdfGeneratorService {
   Future<Uint8List> generateReport({
@@ -16,6 +19,8 @@ class PdfGeneratorService {
     required Map<String, String> deviceData,
     required Map<String, dynamic>? locationData,
     required String certificateId,
+    required String? signaturePath,
+    required String appName,
   }) async {
     final pdf = pw.Document();
     pw.Font font;
@@ -37,35 +42,37 @@ class PdfGeneratorService {
       pdfImages.add(pw.MemoryImage(imageBytes));
     }
 
-    // Load Map Snapshot if available
-    // pw.MemoryImage? mapImage;
+    // Load Signature
+    pw.MemoryImage? signatureImage;
+    if (signaturePath != null) {
+      final sigFile = File(signaturePath);
+      if (await sigFile.exists()) {
+        final sigBytes = await sigFile.readAsBytes();
+        signatureImage = pw.MemoryImage(sigBytes);
+      }
+    }
+
+    // Load Map Snapshot
+    pw.MemoryImage? mapImage;
     if (locationData != null) {
       try {
-        // final double lat = locationData['latitude'];
-        // final double lng = locationData['longitude'];
-        // Using OpenStreetMap static map (requires no key for basic usage, but rate limited.
-        // For production, Google Static Maps is better but requires key).
-        // Using a placeholder or a simple map service if possible.
-        // Let's use a generic map placeholder or try to fetch a static map if a key was provided.
-        // Since no key is provided, I will try to use a public static map service or just text for now
-        // and leave a comment for the user to add their API key for Google Static Maps.
-        // Actually, let's try to use a public OSM static map generator if available,
-        // or just display the coordinates and a placeholder icon.
-        // User asked for "shot of user position on current map".
-        // I'll try to fetch from a free service or just show coordinates with a map icon.
-        // For now, let's try to fetch a map from a free source if possible, otherwise just text.
-        // Let's assume we can't easily get a static map without an API key reliably.
-        // I will add a placeholder image for the map or just the coordinates text with a note.
-        // WAIT, I can use the `google_static_maps_controller` logic if I had a key.
-        // I'll just put a placeholder text for the map image for now to avoid broken images.
-        // OR better, I'll try to download a map tile.
-        // Let's stick to a placeholder for the map image to be safe.
-
-        // IMPROVEMENT: Use a map icon and coordinates.
+        final double lat = locationData['latitude'];
+        final double lng = locationData['longitude'];
+        // Using a public static map service (OSM based)
+        final mapUrl =
+            'https://staticmap.openstreetmap.de/staticmap.php?center=$lat,$lng&zoom=15&size=600x300&maptype=mapnik&markers=$lat,$lng,red-pushpin';
+        final response = await http.get(Uri.parse(mapUrl));
+        if (response.statusCode == 200) {
+          mapImage = pw.MemoryImage(response.bodyBytes);
+        }
       } catch (e) {
         print('Error loading map image: $e');
       }
     }
+
+    final primaryColor = PdfColor.fromInt(0xFF274A31);
+    final dateFormat = DateFormat('MMMM dd, yyyy - hh:mm a');
+    final formattedDate = dateFormat.format(DateTime.now());
 
     pdf.addPage(
       pw.MultiPage(
@@ -73,25 +80,31 @@ class PdfGeneratorService {
           pageFormat: PdfPageFormat.a4,
           margin: const pw.EdgeInsets.all(32),
           theme: pw.ThemeData.withFont(base: font, bold: boldFont),
-          buildBackground: (context) => pw.Container(
-            decoration: pw.BoxDecoration(
-              border: pw.Border.all(color: PdfColors.black, width: 2),
-            ),
-          ),
         ),
-        header: (context) => _buildHeader(title, boldFont),
-        footer: (context) => _buildFooter(context, font),
+        header: (context) =>
+            _buildHeader(title, formattedDate, boldFont, font, primaryColor),
+        footer: (context) => _buildFooter(context, font, primaryColor),
         build: (context) => [
-          _buildUserAndDeviceSection(
-              userData, deviceData, locationData, boldFont),
-          pw.SizedBox(height: 20),
           _buildImagesSection(pdfImages),
           pw.SizedBox(height: 20),
-          _buildImageDetailsTable(images, boldFont),
+          _buildImageDetailsSection(images, boldFont, font, primaryColor),
           pw.SizedBox(height: 20),
-          _buildNotesSection(additionalNotes, importantInfo, boldFont),
+          _buildNotesSection(
+              additionalNotes, importantInfo, boldFont, primaryColor),
           pw.SizedBox(height: 20),
-          _buildQrCodeSection(certificateId, boldFont),
+          _buildSignatureSection(signatureImage, boldFont, primaryColor),
+          pw.SizedBox(height: 20),
+          _buildUserDetailsTable(userData, boldFont, font, primaryColor),
+          pw.SizedBox(height: 20),
+          _buildDeviceDetailsTable(
+              deviceData, appName, boldFont, font, primaryColor),
+          if (locationData != null) ...[
+            pw.SizedBox(height: 20),
+            _buildGeolocationSection(
+                locationData, mapImage, boldFont, primaryColor),
+          ],
+          pw.SizedBox(height: 20),
+          _buildQrCodeSection(certificateId, boldFont, primaryColor),
         ],
       ),
     );
@@ -99,105 +112,55 @@ class PdfGeneratorService {
     return pdf.save();
   }
 
-  pw.Widget _buildHeader(String title, pw.Font font) {
+  pw.Widget _buildHeader(String title, String date, pw.Font boldFont,
+      pw.Font font, PdfColor primaryColor) {
     return pw.Column(
       children: [
         pw.Text(
           title,
           style: pw.TextStyle(
-              font: font, fontSize: 24, fontWeight: pw.FontWeight.bold),
+              font: boldFont,
+              fontSize: 24,
+              fontWeight: pw.FontWeight.bold,
+              color: primaryColor),
           textAlign: pw.TextAlign.center,
         ),
-        pw.SizedBox(height: 20),
-        pw.Divider(),
-        pw.SizedBox(height: 20),
-      ],
-    );
-  }
-
-  pw.Widget _buildFooter(pw.Context context, pw.Font font) {
-    return pw.Container(
-      alignment: pw.Alignment.centerRight,
-      margin: const pw.EdgeInsets.only(top: 10),
-      child: pw.Text(
-        'Generated by Digify - Page ${context.pageNumber} of ${context.pagesCount}',
-        style: pw.TextStyle(font: font, fontSize: 10, color: PdfColors.grey),
-      ),
-    );
-  }
-
-  pw.Widget _buildUserAndDeviceSection(
-    Map<String, String> userData,
-    Map<String, String> deviceData,
-    Map<String, dynamic>? locationData,
-    pw.Font font,
-  ) {
-    return pw.Column(
-      crossAxisAlignment: pw.CrossAxisAlignment.start,
-      children: [
-        pw.Text('User & Device Information',
-            style: pw.TextStyle(
-                font: font, fontSize: 18, fontWeight: pw.FontWeight.bold)),
+        pw.SizedBox(height: 5),
+        pw.Text(
+          date,
+          style: pw.TextStyle(font: font, fontSize: 10, color: PdfColors.grey),
+          textAlign: pw.TextAlign.center,
+        ),
         pw.SizedBox(height: 10),
-        pw.Row(
-          crossAxisAlignment: pw.CrossAxisAlignment.start,
-          children: [
-            pw.Expanded(
-              child: pw.Column(
-                crossAxisAlignment: pw.CrossAxisAlignment.start,
-                children: [
-                  _buildInfoRow('Name', userData['name'] ?? 'N/A'),
-                  _buildInfoRow('Email', userData['email'] ?? 'N/A'),
-                  _buildInfoRow('UID', userData['uid'] ?? 'N/A'),
-                ],
-              ),
-            ),
-            pw.SizedBox(width: 20),
-            pw.Expanded(
-              child: pw.Column(
-                crossAxisAlignment: pw.CrossAxisAlignment.start,
-                children: [
-                  _buildInfoRow('Device', deviceData['model'] ?? 'N/A'),
-                  _buildInfoRow(
-                      'OS', '${deviceData['os']} ${deviceData['osVersion']}'),
-                  _buildInfoRow('IP', deviceData['ip'] ?? 'N/A'),
-                ],
-              ),
-            ),
-          ],
-        ),
-        if (locationData != null) ...[
-          pw.SizedBox(height: 10),
-          pw.Text('Location',
-              style: pw.TextStyle(fontWeight: pw.FontWeight.bold)),
-          pw.Text(
-              'Lat: ${locationData['latitude']}, Lng: ${locationData['longitude']}'),
-          // Placeholder for map image
-          pw.Container(
-            height: 100,
-            width: double.infinity,
-            color: PdfColors.grey200,
-            alignment: pw.Alignment.center,
-            child: pw.Text('Map Snapshot (Requires API Key)'),
-          ),
-        ],
+        pw.Container(height: 1, color: primaryColor),
+        pw.SizedBox(height: 20),
       ],
     );
   }
 
-  pw.Widget _buildInfoRow(String label, String value) {
-    return pw.Padding(
-      padding: const pw.EdgeInsets.only(bottom: 4),
-      child: pw.RichText(
-        text: pw.TextSpan(
+  pw.Widget _buildFooter(
+      pw.Context context, pw.Font font, PdfColor primaryColor) {
+    return pw.Column(
+      children: [
+        pw.SizedBox(height: 10),
+        pw.Container(height: 1, color: primaryColor),
+        pw.SizedBox(height: 5),
+        pw.Row(
+          mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
           children: [
-            pw.TextSpan(
-                text: '$label: ',
-                style: pw.TextStyle(fontWeight: pw.FontWeight.bold)),
-            pw.TextSpan(text: value),
+            pw.Text(
+              'Generated by Digify',
+              style: pw.TextStyle(
+                  font: font, fontSize: 10, color: PdfColors.grey700),
+            ),
+            pw.Text(
+              '${context.pageNumber}',
+              style: pw.TextStyle(
+                  font: font, fontSize: 10, color: PdfColors.grey700),
+            ),
           ],
         ),
-      ),
+      ],
     );
   }
 
@@ -214,47 +177,225 @@ class PdfGeneratorService {
     );
   }
 
-  pw.Widget _buildImageDetailsTable(List<File> images, pw.Font font) {
-    return pw.Table.fromTextArray(
-      headers: ['Image Name', 'Size', 'Creation Date'],
-      data: images.map((file) {
-        final stat = file.statSync();
-        final size = (stat.size / 1024).toStringAsFixed(2) + ' KB';
-        final date = stat.changed.toString().split('.')[0];
-        return [file.path.split('/').last, size, date];
-      }).toList(),
-      headerStyle: pw.TextStyle(font: font, fontWeight: pw.FontWeight.bold),
-      headerDecoration: const pw.BoxDecoration(color: PdfColors.grey300),
-      cellAlignment: pw.Alignment.centerLeft,
+  pw.Widget _buildImageDetailsSection(List<File> images, pw.Font boldFont,
+      pw.Font font, PdfColor primaryColor) {
+    return pw.Column(
+      crossAxisAlignment: pw.CrossAxisAlignment.start,
+      children: [
+        pw.Text('Captured Photo Details',
+            style: pw.TextStyle(
+                font: boldFont,
+                fontSize: 16,
+                fontWeight: pw.FontWeight.bold,
+                color: primaryColor)),
+        pw.SizedBox(height: 10),
+        ...images.map((file) {
+          final stat = file.statSync();
+          final size = (stat.size / 1024).toStringAsFixed(2) + ' KB';
+          final date = DateFormat('yyyy-MM-dd HH:mm:ss').format(stat.changed);
+          String resolution = 'Unknown';
+          try {
+            final image = img.decodeImage(file.readAsBytesSync());
+            if (image != null) {
+              resolution = '${image.width} x ${image.height}';
+            }
+          } catch (e) {
+            print('Error getting resolution: $e');
+          }
+
+          return pw.Container(
+            margin: const pw.EdgeInsets.only(bottom: 10),
+            child: pw.Table(
+              border: pw.TableBorder.all(color: PdfColors.grey300),
+              children: [
+                _buildTableRow('Image Name', file.path.split('/').last,
+                    boldFont, font, primaryColor),
+                _buildTableRow(
+                    'Creation Date', date, boldFont, font, primaryColor),
+                _buildTableRow('File Size', size, boldFont, font, primaryColor),
+                _buildTableRow(
+                    'Resolution', resolution, boldFont, font, primaryColor),
+              ],
+            ),
+          );
+        }).toList(),
+      ],
     );
   }
 
-  pw.Widget _buildNotesSection(String notes, String info, pw.Font font) {
+  pw.TableRow _buildTableRow(String label, String value, pw.Font boldFont,
+      pw.Font font, PdfColor primaryColor) {
+    return pw.TableRow(
+      children: [
+        pw.Container(
+          padding: const pw.EdgeInsets.all(5),
+          color: PdfColors.grey100,
+          child: pw.Text(label,
+              style:
+                  pw.TextStyle(font: boldFont, fontWeight: pw.FontWeight.bold)),
+        ),
+        pw.Container(
+          padding: const pw.EdgeInsets.all(5),
+          child: pw.Text(value, style: pw.TextStyle(font: font)),
+        ),
+      ],
+    );
+  }
+
+  pw.Widget _buildNotesSection(
+      String notes, String info, pw.Font font, PdfColor primaryColor) {
     return pw.Column(
       crossAxisAlignment: pw.CrossAxisAlignment.start,
       children: [
         if (info.isNotEmpty) ...[
           pw.Text('Important Information',
               style: pw.TextStyle(
-                  font: font, fontSize: 16, fontWeight: pw.FontWeight.bold)),
+                  font: font,
+                  fontSize: 16,
+                  fontWeight: pw.FontWeight.bold,
+                  color: primaryColor)),
           pw.Text(info),
           pw.SizedBox(height: 10),
         ],
         if (notes.isNotEmpty) ...[
           pw.Text('Additional Notes',
               style: pw.TextStyle(
-                  font: font, fontSize: 16, fontWeight: pw.FontWeight.bold)),
+                  font: font,
+                  fontSize: 16,
+                  fontWeight: pw.FontWeight.bold,
+                  color: primaryColor)),
           pw.Text(notes),
         ],
       ],
     );
   }
 
-  pw.Widget _buildQrCodeSection(String data, pw.Font font) {
+  pw.Widget _buildSignatureSection(
+      pw.MemoryImage? signature, pw.Font font, PdfColor primaryColor) {
+    return pw.Column(
+      crossAxisAlignment: pw.CrossAxisAlignment.start,
+      children: [
+        pw.Text('Electronic Signature',
+            style: pw.TextStyle(
+                font: font,
+                fontSize: 16,
+                fontWeight: pw.FontWeight.bold,
+                color: primaryColor)),
+        pw.SizedBox(height: 10),
+        if (signature != null)
+          pw.Container(
+            height: 80,
+            alignment: pw.Alignment.centerLeft,
+            child: pw.Image(signature, fit: pw.BoxFit.contain),
+          )
+        else
+          pw.Text('No signature available',
+              style: pw.TextStyle(font: font, color: PdfColors.grey)),
+      ],
+    );
+  }
+
+  pw.Widget _buildUserDetailsTable(Map<String, String> userData,
+      pw.Font boldFont, pw.Font font, PdfColor primaryColor) {
+    return pw.Column(
+      crossAxisAlignment: pw.CrossAxisAlignment.start,
+      children: [
+        pw.Text('User Details',
+            style: pw.TextStyle(
+                font: boldFont,
+                fontSize: 16,
+                fontWeight: pw.FontWeight.bold,
+                color: primaryColor)),
+        pw.SizedBox(height: 10),
+        pw.Table(
+          border: pw.TableBorder.all(color: PdfColors.grey300),
+          children: [
+            _buildTableRow('Full Name', userData['name'] ?? 'N/A', boldFont,
+                font, primaryColor),
+            _buildTableRow('Email', userData['email'] ?? 'N/A', boldFont, font,
+                primaryColor),
+            _buildTableRow('User ID', userData['uid'] ?? 'N/A', boldFont, font,
+                primaryColor),
+          ],
+        ),
+      ],
+    );
+  }
+
+  pw.Widget _buildDeviceDetailsTable(Map<String, String> deviceData,
+      String appName, pw.Font boldFont, pw.Font font, PdfColor primaryColor) {
+    return pw.Column(
+      crossAxisAlignment: pw.CrossAxisAlignment.start,
+      children: [
+        pw.Text('Device Details',
+            style: pw.TextStyle(
+                font: boldFont,
+                fontSize: 16,
+                fontWeight: pw.FontWeight.bold,
+                color: primaryColor)),
+        pw.SizedBox(height: 10),
+        pw.Table(
+          border: pw.TableBorder.all(color: PdfColors.grey300),
+          children: [
+            _buildTableRow('Device Model', deviceData['model'] ?? 'N/A',
+                boldFont, font, primaryColor),
+            _buildTableRow('Operating System', deviceData['os'] ?? 'N/A',
+                boldFont, font, primaryColor),
+            _buildTableRow('OS Version', deviceData['osVersion'] ?? 'N/A',
+                boldFont, font, primaryColor),
+            _buildTableRow('App Name', appName, boldFont, font, primaryColor),
+            _buildTableRow('IP Address', deviceData['ip'] ?? 'N/A', boldFont,
+                font, primaryColor),
+          ],
+        ),
+      ],
+    );
+  }
+
+  pw.Widget _buildGeolocationSection(Map<String, dynamic> locationData,
+      pw.MemoryImage? mapImage, pw.Font font, PdfColor primaryColor) {
+    return pw.Column(
+      crossAxisAlignment: pw.CrossAxisAlignment.start,
+      children: [
+        pw.Text('Geolocation',
+            style: pw.TextStyle(
+                font: font,
+                fontSize: 16,
+                fontWeight: pw.FontWeight.bold,
+                color: primaryColor)),
+        pw.SizedBox(height: 10),
+        pw.Text(
+            'Latitude: ${locationData['latitude']}, Longitude: ${locationData['longitude']}',
+            style: pw.TextStyle(font: font)),
+        pw.SizedBox(height: 10),
+        if (mapImage != null)
+          pw.Container(
+            height: 200,
+            width: double.infinity,
+            child: pw.Image(mapImage, fit: pw.BoxFit.cover),
+          )
+        else
+          pw.Container(
+            height: 100,
+            width: double.infinity,
+            color: PdfColors.grey200,
+            alignment: pw.Alignment.center,
+            child: pw.Text('Map Snapshot Unavailable',
+                style: pw.TextStyle(color: PdfColors.grey700)),
+          ),
+      ],
+    );
+  }
+
+  pw.Widget _buildQrCodeSection(
+      String data, pw.Font font, PdfColor primaryColor) {
     return pw.Column(
       children: [
         pw.Text('Scan to Verify',
-            style: pw.TextStyle(font: font, fontWeight: pw.FontWeight.bold)),
+            style: pw.TextStyle(
+                font: font,
+                fontWeight: pw.FontWeight.bold,
+                color: primaryColor)),
         pw.SizedBox(height: 10),
         pw.BarcodeWidget(
           barcode: pw.Barcode.qrCode(),

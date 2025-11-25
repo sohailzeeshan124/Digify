@@ -1,5 +1,5 @@
 import 'package:digify/mainpage_folder/insider_pages/archive_page.dart';
-import 'package:digify/mainpage_folder/insider_pages/chat_page.dart';
+import 'package:digify/mainpage_folder/insider_pages/chats/chat_page.dart';
 import 'package:digify/mainpage_folder/insider_pages/creation_page.dart/create_page.dart';
 import 'package:digify/mainpage_folder/insider_pages/fileverification_folder/verify_page.dart';
 import 'package:digify/mainpage_folder/insider_pages/profile_page.dart';

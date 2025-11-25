@@ -56,6 +56,8 @@ class VerifyPage extends StatelessWidget {
             },
           ),
           const SizedBox(height: 24),
+          _buildSectionHeader("Certificates"),
+          const SizedBox(height: 12),
           _buildOptionCard(
             icon: Icons.qr_code_scanner,
             title: 'Scan QR Code',

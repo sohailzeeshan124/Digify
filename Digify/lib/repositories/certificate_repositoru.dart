@@ -62,6 +62,7 @@ class CertificateRepository {
         final existingData = CertificateModel.fromMap(snapshot.data()!);
 
         final updatedDoc = CertificateModel(
+          localpdfpath: doc.localpdfpath,
           docId: existingData.docId,
           Name: existingData.Name,
           uploadedBy: existingData.uploadedBy,

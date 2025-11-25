@@ -2,65 +2,99 @@ import 'dart:io';
 import 'dart:ui';
 
 import 'package:flutter/material.dart';
-import 'package:image/image.dart' as img;
 import 'package:path_provider/path_provider.dart';
 import 'package:syncfusion_flutter_pdf/pdf.dart' as sf;
 import 'package:qr_flutter/qr_flutter.dart';
 
 class PdfUtils {
-  /// Embeds the signature image onto the existing PDF at the given position, scale, and rotation
-  static Future<String> embedSignature({
+  /// Embeds multiple overlays (images, text, drawings) onto the PDF
+  static Future<String> embedOverlays({
     required String pdfPath,
-    required String signaturePath,
-    required Offset offset,
-    required double width,
-    required double height,
-    required double rotation,
+    required List<PdfOverlayItem> overlays,
   }) async {
     // Load the original PDF
     final originalPdf = File(pdfPath).readAsBytesSync();
     final document = sf.PdfDocument(inputBytes: originalPdf);
 
-    // Load and decode the signature image
-    final signatureImage = File(signaturePath).readAsBytesSync();
-    final img.Image decodedSignature = img.decodeImage(signatureImage)!;
+    for (final overlay in overlays) {
+      // Determine page index
+      int pageIndex = overlay.pageIndex;
+      if (pageIndex < 0 || pageIndex >= document.pages.count) {
+        // Fallback logic: sign the second-to-last page if > 1 page, else last page
+        pageIndex = document.pages.count > 1
+            ? document.pages.count - 2
+            : document.pages.count - 1;
+      }
 
-    // Always sign the second-to-last page if more than one page (assume last is QR code page)
-    int signPageIndex = document.pages.count > 1
-        ? document.pages.count - 2
-        : document.pages.count - 1;
-    final signPage = document.pages[signPageIndex];
-    final graphics = signPage.graphics;
+      final page = document.pages[pageIndex];
+      final graphics = page.graphics;
 
-    // Convert signature to PDF image
-    final signaturePdfImage = sf.PdfBitmap(signatureImage);
-
-    // Apply transformations
-    graphics.save();
-    graphics.translateTransform(offset.dx, offset.dy);
-    graphics.rotateTransform(rotation);
-
-    // Draw the signature with scaled dimensions
-    graphics.drawImage(
-      signaturePdfImage,
-      Rect.fromLTWH(
-        0,
-        0,
-        width,
-        height,
-      ),
-    );
-    graphics.restore();
+      graphics.save();
+      if (overlay is PdfImageOverlay) {
+        final imageBytes = File(overlay.imagePath).readAsBytesSync();
+        final pdfImage = sf.PdfBitmap(imageBytes);
+        graphics.translateTransform(overlay.offset.dx, overlay.offset.dy);
+        graphics.rotateTransform(overlay.rotation);
+        graphics.drawImage(
+          pdfImage,
+          Rect.fromLTWH(0, 0, overlay.width, overlay.height),
+        );
+      } else if (overlay is PdfTextOverlay) {
+        final font = sf.PdfStandardFont(
+            _getFontFamily(overlay.fontFamily), overlay.fontSize);
+        final brush = sf.PdfSolidBrush(sf.PdfColor(
+            overlay.color.red, overlay.color.green, overlay.color.blue));
+        graphics.drawString(
+          overlay.text,
+          font,
+          brush: brush,
+          bounds: Rect.fromLTWH(
+              overlay.offset.dx, overlay.offset.dy, 500, 100), // Approx bounds
+        );
+      } else if (overlay is PdfDrawingOverlay) {
+        final pen = sf.PdfPen(
+          sf.PdfColor(
+              overlay.color.red, overlay.color.green, overlay.color.blue),
+          width: overlay.strokeWidth,
+        );
+        // Draw paths
+        for (int i = 0; i < overlay.points.length - 1; i++) {
+          if (overlay.points[i] != null && overlay.points[i + 1] != null) {
+            graphics.drawLine(
+              pen,
+              overlay.points[i]!,
+              overlay.points[i + 1]!,
+            );
+          }
+        }
+      }
+      graphics.restore();
+    }
 
     // Save the modified document
     final outputDir = await getTemporaryDirectory();
-    final outputPath = '${outputDir.path}/signed_document.pdf';
+    final timestamp = DateTime.now().millisecondsSinceEpoch;
+    final outputPath = '${outputDir.path}/signed_document_$timestamp.pdf';
     final outputFile = File(outputPath);
     final bytes = await document.save();
     await outputFile.writeAsBytes(bytes);
     document.dispose();
 
     return outputPath;
+  }
+
+  static sf.PdfFontFamily _getFontFamily(String fontFamily) {
+    switch (fontFamily) {
+      case 'Times':
+        return sf.PdfFontFamily.timesRoman;
+      case 'Courier':
+        return sf.PdfFontFamily.courier;
+      case 'Helvetica':
+      case 'Arial':
+      case 'Roboto':
+      default:
+        return sf.PdfFontFamily.helvetica;
+    }
   }
 
   /// Appends a final page with a QR code that links to the Firestore document
@@ -70,7 +104,7 @@ class PdfUtils {
     final document = sf.PdfDocument(inputBytes: pdfBytes);
 
     // Generate QR code data using the Firestore document UID
-    final qrData = docId; // Just use the document UID
+    final qrData = docId;
 
     // Generate QR code image
     final qrImage = await QrPainter(
@@ -122,11 +156,59 @@ class PdfUtils {
 
   /// Returns the PDF file path for use with SfPdfViewer.file
   static String getPdfFilePath(String path) {
-    // This method is a placeholder for future logic if needed
     return path;
   }
+}
 
-  // For UI: Use SfPdfViewer.file(File(pdfPath)) to render the PDF.
-  // To create a horizontal grid of pages with overlays, use a PageView.builder or ListView.builder
-  // and overlay your signature widget using a Stack. For dotted borders, use a CustomPainter.
+// Overlay Classes
+abstract class PdfOverlayItem {
+  final int pageIndex;
+  PdfOverlayItem({this.pageIndex = -1});
+}
+
+class PdfImageOverlay extends PdfOverlayItem {
+  final String imagePath;
+  final Offset offset;
+  final double width;
+  final double height;
+  final double rotation;
+
+  PdfImageOverlay({
+    required this.imagePath,
+    required this.offset,
+    required this.width,
+    required this.height,
+    this.rotation = 0,
+    int pageIndex = -1,
+  }) : super(pageIndex: pageIndex);
+}
+
+class PdfTextOverlay extends PdfOverlayItem {
+  final String text;
+  final Offset offset;
+  final double fontSize;
+  final Color color;
+  final String fontFamily;
+
+  PdfTextOverlay({
+    required this.text,
+    required this.offset,
+    required this.fontSize,
+    required this.color,
+    required this.fontFamily,
+    int pageIndex = -1,
+  }) : super(pageIndex: pageIndex);
+}
+
+class PdfDrawingOverlay extends PdfOverlayItem {
+  final List<Offset?> points;
+  final Color color;
+  final double strokeWidth;
+
+  PdfDrawingOverlay({
+    required this.points,
+    required this.color,
+    required this.strokeWidth,
+    int pageIndex = -1,
+  }) : super(pageIndex: pageIndex);
 }
