@@ -1,8 +1,7 @@
-import 'dart:io';
-
 import 'package:cloudinary_sdk/cloudinary_sdk.dart';
-
-import 'package:cloudinary_sdk/cloudinary_sdk.dart';
+import 'package:http/http.dart' as http;
+import 'dart:convert';
+import 'package:crypto/crypto.dart';
 
 class CloudinaryRepository {
   late Cloudinary cloudinary;
@@ -64,5 +63,62 @@ class CloudinaryRepository {
       print("Cloudinary upload failed: $e");
       return null;
     }
+  }
+
+  /// Delete image from Cloudinary
+  Future<bool> deleteImage(String imageUrl) async {
+    try {
+      // Extract public ID from URL
+      final uri = Uri.parse(imageUrl);
+      final pathSegments = uri.pathSegments;
+      int uploadIndex = pathSegments.indexOf('upload');
+      if (uploadIndex == -1 || uploadIndex + 2 >= pathSegments.length) {
+        print("Invalid Cloudinary URL format");
+        return false;
+      }
+
+      List<String> publicIdSegments = pathSegments.sublist(uploadIndex + 2);
+      String publicId = publicIdSegments.join('/');
+      int dotIndex = publicId.lastIndexOf('.');
+      if (dotIndex != -1) {
+        publicId = publicId.substring(0, dotIndex);
+      }
+
+      // Use HTTP to delete
+      final timestamp = DateTime.now().millisecondsSinceEpoch.toString();
+      final signature = _generateSignature(publicId, timestamp);
+
+      final response = await http.post(
+        Uri.parse('https://api.cloudinary.com/v1_1/dl6euqas9/image/destroy'),
+        body: {
+          'public_id': publicId,
+          'api_key': '332321586294733',
+          'timestamp': timestamp,
+          'signature': signature,
+        },
+      );
+
+      return response.statusCode == 200;
+    } catch (e) {
+      print("Cloudinary delete failed: $e");
+      return false;
+    }
+  }
+
+  String _generateSignature(String publicId, String timestamp) {
+    // Simple signature generation: public_id + timestamp + api_secret
+    // Note: In production, this should be more robust and handle parameters sorting
+    // But for destroy, typically only public_id and timestamp are needed.
+    // However, Cloudinary requires parameters to be sorted alphabetically.
+    // public_id=...&timestamp=...
+
+    final String params = 'public_id=$publicId&timestamp=$timestamp';
+    final String toSign =
+        '$params${'k2gglkp-xp6x01rEPXGWC8uH_zE'}'; // Append API Secret
+
+    // SHA1 hash
+    var bytes = utf8.encode(toSign);
+    var digest = sha1.convert(bytes);
+    return digest.toString();
   }
 }

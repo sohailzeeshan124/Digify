@@ -110,6 +110,13 @@ class UserModel {
       return out;
     }
 
+    int _parseInt(dynamic value) {
+      if (value == null) return 0;
+      if (value is int) return value;
+      if (value is String) return int.tryParse(value) ?? 0;
+      return 0;
+    }
+
     return UserModel(
       uid: uid,
       email: data['email'] ?? '',
@@ -138,21 +145,13 @@ class UserModel {
           : null,
       isGoogleDriveLinked: data['isGoogleDriveLinked'] ?? false,
       googleDriveEmail: data['googleDriveEmail'],
-      pdfCreatedCount: (data['pdfCreatedCount'] ?? 0) is int
-          ? data['pdfCreatedCount'] as int
-          : int.tryParse('${data['pdfCreatedCount'] ?? 0}') ?? 0,
+      pdfCreatedCount: _parseInt(data['pdfCreatedCount']),
       pdfCreatedAt: _parseDateList(data['pdfCreatedAt']),
-      documentsSignedCount: (data['documentsSignedCount'] ?? 0) is int
-          ? data['documentsSignedCount'] as int
-          : int.tryParse('${data['documentsSignedCount'] ?? 0}') ?? 0,
+      documentsSignedCount: _parseInt(data['documentsSignedCount']),
       documentsSignedAt: _parseDateList(data['documentsSignedAt']),
-      certificatesCreatedCount: (data['certificatesCreatedCount'] ?? 0) is int
-          ? data['certificatesCreatedCount'] as int
-          : int.tryParse('${data['certificatesCreatedCount'] ?? 0}') ?? 0,
+      certificatesCreatedCount: _parseInt(data['certificatesCreatedCount']),
       certificatesCreatedAt: _parseDateList(data['certificatesCreatedAt']),
-      imagesToTextCount: (data['imagesToTextCount'] ?? 0) is int
-          ? data['imagesToTextCount'] as int
-          : int.tryParse('${data['imagesToTextCount'] ?? 0}') ?? 0,
+      imagesToTextCount: _parseInt(data['imagesToTextCount']),
       imagesToTextAt: _parseDateList(data['imagesToTextAt']),
     );
   }

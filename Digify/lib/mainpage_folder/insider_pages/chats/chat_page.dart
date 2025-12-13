@@ -150,23 +150,31 @@ class _ChatPageState extends State<ChatPage> {
                         _foundUser = null;
                       });
 
-                      final user = await _userViewModel
-                          .getUserByUsername(_usernameController.text.trim());
+                      try {
+                        final user = await _userViewModel
+                            .getUserByUsername(_usernameController.text.trim());
 
-                      setState(() {
-                        _isSearching = false;
-                        if (user != null) {
-                          if (user.uid == currentUserId) {
-                            _searchError = "You cannot add yourself";
-                          } else if (_friends.any((f) => f.uid == user.uid)) {
-                            _searchError = "User is already your friend";
+                        setState(() {
+                          _isSearching = false;
+                          if (user != null) {
+                            if (user.uid == currentUserId) {
+                              _searchError = "You cannot add yourself";
+                            } else if (_friends.any((f) => f.uid == user.uid)) {
+                              _searchError = "User is already your friend";
+                            } else {
+                              _foundUser = user;
+                            }
                           } else {
-                            _foundUser = user;
+                            _searchError = "User not found";
                           }
-                        } else {
-                          _searchError = "User not found";
-                        }
-                      });
+                        });
+                      } catch (e) {
+                        setState(() {
+                          _isSearching = false;
+                          _searchError = "An error occurred: $e";
+                          debugPrint('Your message here: $e');
+                        });
+                      }
                     },
                     style: ElevatedButton.styleFrom(
                       backgroundColor: AppColors.primaryGreen,
@@ -353,7 +361,7 @@ class _ChatPageState extends State<ChatPage> {
                                         CrossAxisAlignment.start,
                                     children: [
                                       Text(
-                                        "AI Assistant",
+                                        "AI Chatbot",
                                         style: GoogleFonts.poppins(
                                           fontSize: 16,
                                           fontWeight: FontWeight.w600,

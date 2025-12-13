@@ -109,6 +109,36 @@ flutter_icons:
 
 # The following section is specific to Flutter packages.
 flutter:
+  fonts:
+    - family: Alexbrush
+      fonts:
+        - asset: assets/fonts/AlexBrush-Regular.ttf
+    
+    - family: Allura
+      fonts:
+        - asset: assets/fonts/Allura-Regular.ttf
+    
+    - family: Greatvibes
+      fonts:
+        - asset: assets/fonts/GreatVibes-Regular.ttf
+    
+    - family: Pacifico
+      fonts:
+        - asset: assets/fonts/Pacifico-Regular.ttf
+    
+    - family: Sacramento
+      fonts:
+        - asset: assets/fonts/Sacramento-Regular.ttf
+    
+    - family: Yellowtail
+      fonts:
+        - asset: assets/fonts/Yellowtail-Regular.ttf
+    
+    
+
+
+
+
 
   # The following line ensures that the Material Icons font is
   # included with your application, so that you can use the icons in

@@ -4,12 +4,14 @@ import 'package:digify/mainpage_folder/setting%20pages/account%20folder/account_
 import 'package:digify/mainpage_folder/setting%20pages/account%20folder/analytics_page.dart';
 import 'package:digify/mainpage_folder/setting%20pages/account%20folder/devices_connected_page.dart';
 import 'package:digify/mainpage_folder/setting%20pages/data%20&%20privacy/data&privacy.dart';
+import 'package:digify/mainpage_folder/setting%20pages/document%20setting/stampsetting.dart';
 import 'package:digify/screens/complete_your_profile/contact_support.dart';
 import 'package:digify/utils/app_colors.dart';
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:digify/authentication/signin_page.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:digify/mainpage_folder/setting%20pages/document%20setting/signaturesetting.dart';
 
 class SettingsPage extends StatelessWidget {
   const SettingsPage({super.key});
@@ -86,6 +88,7 @@ class SettingsPage extends StatelessWidget {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
+        iconTheme: const IconThemeData(color: Colors.white),
         title: const Text(
           'Settings',
           style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
@@ -137,17 +140,13 @@ class SettingsPage extends StatelessWidget {
             _buildOptionRow(context,
                 icon: Icons.edit, label: 'Signature setting', onTap: () {
               Navigator.of(context).push(
-                MaterialPageRoute(
-                    builder: (_) =>
-                        const PlaceholderPage(title: 'Signature setting')),
+                MaterialPageRoute(builder: (_) => const SignatureSettingPage()),
               );
             }),
             _buildOptionRow(context,
                 icon: Icons.approval, label: 'Stamp setting', onTap: () {
               Navigator.of(context).push(
-                MaterialPageRoute(
-                    builder: (_) =>
-                        const PlaceholderPage(title: 'Stamp setting')),
+                MaterialPageRoute(builder: (_) => const StampSetting()),
               );
             }),
           ]),
