@@ -1,4 +1,5 @@
 import 'package:digify/mainpage_folder/insider_pages/chats/chat_with_ai.dart';
+import 'package:digify/mainpage_folder/insider_pages/chats/person_to_person/person_to_personchat.dart';
 import 'package:digify/modal_classes/chat.dart';
 import 'package:digify/modal_classes/user_data.dart';
 import 'package:digify/utils/app_colors.dart';
@@ -64,6 +65,22 @@ class _ChatPageState extends State<ChatPage> {
     setState(() {
       _recentChats = chats;
     });
+  }
+
+  void _navigateToChat(UserModel otherUser) async {
+    final currentUser = await _userViewModel.getUser(currentUserId!);
+    if (currentUser == null) return;
+
+    if (!mounted) return;
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => PersonToPersonChatPage(
+          currentUser: currentUser,
+          otherUser: otherUser,
+        ),
+      ),
+    ).then((_) => _loadData());
   }
 
   void _showAddFriendDialog() {
@@ -401,54 +418,59 @@ class _ChatPageState extends State<ChatPage> {
                         itemCount: _friends.length,
                         itemBuilder: (context, index) {
                           final friend = _friends[index];
-                          return Padding(
-                            padding: const EdgeInsets.only(right: 16),
-                            child: Column(
-                              children: [
-                                Stack(
-                                  children: [
-                                    CircleAvatar(
-                                      radius: 24,
-                                      backgroundImage: friend.profilePicUrl !=
-                                              null
-                                          ? NetworkImage(friend.profilePicUrl!)
-                                          : null,
-                                      backgroundColor: Colors.grey[300],
-                                      child: friend.profilePicUrl == null
-                                          ? Text(
-                                              friend.username[0].toUpperCase(),
-                                              style: const TextStyle(
-                                                  fontSize: 20,
-                                                  color: Colors.white),
-                                            )
-                                          : null,
-                                    ),
-                                    Positioned(
-                                      right: 0,
-                                      bottom: 0,
-                                      child: Container(
-                                        width: 14,
-                                        height: 14,
-                                        decoration: BoxDecoration(
-                                          color: Colors.green,
-                                          shape: BoxShape.circle,
-                                          border: Border.all(
-                                              color: Colors.white, width: 2),
+                          return InkWell(
+                            onTap: () => _navigateToChat(friend),
+                            child: Padding(
+                              padding: const EdgeInsets.only(right: 16),
+                              child: Column(
+                                children: [
+                                  Stack(
+                                    children: [
+                                      CircleAvatar(
+                                        radius: 24,
+                                        backgroundImage:
+                                            friend.profilePicUrl != null
+                                                ? NetworkImage(
+                                                    friend.profilePicUrl!)
+                                                : null,
+                                        backgroundColor: Colors.grey[300],
+                                        child: friend.profilePicUrl == null
+                                            ? Text(
+                                                friend.username[0]
+                                                    .toUpperCase(),
+                                                style: const TextStyle(
+                                                    fontSize: 20,
+                                                    color: Colors.white),
+                                              )
+                                            : null,
+                                      ),
+                                      Positioned(
+                                        right: 0,
+                                        bottom: 0,
+                                        child: Container(
+                                          width: 14,
+                                          height: 14,
+                                          decoration: BoxDecoration(
+                                            color: Colors.green,
+                                            shape: BoxShape.circle,
+                                            border: Border.all(
+                                                color: Colors.white, width: 2),
+                                          ),
                                         ),
                                       ),
-                                    ),
-                                  ],
-                                ),
-                                const SizedBox(height: 4),
-                                Text(
-                                  friend.username.split('#')[0],
-                                  style: GoogleFonts.poppins(
-                                    fontSize: 11,
-                                    fontWeight: FontWeight.w500,
-                                    color: Colors.black87,
+                                    ],
                                   ),
-                                ),
-                              ],
+                                  const SizedBox(height: 4),
+                                  Text(
+                                    friend.username.split('#')[0],
+                                    style: GoogleFonts.poppins(
+                                      fontSize: 11,
+                                      fontWeight: FontWeight.w500,
+                                      color: Colors.black87,
+                                    ),
+                                  ),
+                                ],
+                              ),
                             ),
                           );
                         },
@@ -469,9 +491,7 @@ class _ChatPageState extends State<ChatPage> {
                         if (otherUser == null) return const SizedBox.shrink();
 
                         return InkWell(
-                          onTap: () {
-                            // Navigate to chat detail
-                          },
+                          onTap: () => _navigateToChat(otherUser),
                           child: Padding(
                             padding: const EdgeInsets.symmetric(
                                 horizontal: 16, vertical: 8),

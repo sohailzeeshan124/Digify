@@ -66,4 +66,21 @@ class ChatRepository {
       return Result.failure("Error fetching messages: ${e.toString()}");
     }
   }
+
+  Stream<List<ChatModel>> getChatStream(
+      String currentUserId, String otherUserId) {
+    return _firestore.collection('chats').snapshots().map((snapshot) {
+      final messages = snapshot.docs
+          .map((doc) => ChatModel.fromMap(doc.data()))
+          .where((chat) =>
+              (chat.senderId == currentUserId &&
+                  chat.receiverId == otherUserId) ||
+              (chat.senderId == otherUserId &&
+                  chat.receiverId == currentUserId))
+          .toList();
+
+      messages.sort((a, b) => b.sentAt.compareTo(a.sentAt));
+      return messages;
+    });
+  }
 }

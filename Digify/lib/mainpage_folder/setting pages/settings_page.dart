@@ -5,6 +5,9 @@ import 'package:digify/mainpage_folder/setting%20pages/account%20folder/analytic
 import 'package:digify/mainpage_folder/setting%20pages/account%20folder/devices_connected_page.dart';
 import 'package:digify/mainpage_folder/setting%20pages/data%20&%20privacy/data&privacy.dart';
 import 'package:digify/mainpage_folder/setting%20pages/document%20setting/stampsetting.dart';
+import 'package:digify/mainpage_folder/setting%20pages/suport_settings/acknowledgement.dart';
+import 'package:digify/mainpage_folder/setting%20pages/suport_settings/help_center.dart';
+import 'package:digify/mainpage_folder/setting%20pages/suport_settings/whats_new.dart';
 import 'package:digify/screens/complete_your_profile/contact_support.dart';
 import 'package:digify/utils/app_colors.dart';
 import 'package:flutter/material.dart';
@@ -152,24 +155,21 @@ class SettingsPage extends StatelessWidget {
           ]),
           _buildSection('Support', [
             _buildOptionRow(context,
-                icon: Icons.support_agent, label: 'Support', onTap: () {
+                icon: Icons.support_agent, label: 'Help Center', onTap: () {
               Navigator.of(context).push(
-                MaterialPageRoute(builder: (_) => const ContactSupportPage()),
+                MaterialPageRoute(builder: (_) => const HelpCenterPage()),
               );
             }),
             _buildOptionRow(context,
                 icon: Icons.info, label: 'Acknowledgements', onTap: () {
               Navigator.of(context).push(
-                MaterialPageRoute(
-                    builder: (_) =>
-                        const PlaceholderPage(title: 'Acknowledgements')),
+                MaterialPageRoute(builder: (_) => const AcknowledgementPage()),
               );
             }),
             _buildOptionRow(context,
                 icon: Icons.new_releases, label: "What's new", onTap: () {
               Navigator.of(context).push(
-                MaterialPageRoute(
-                    builder: (_) => const PlaceholderPage(title: "What's new")),
+                MaterialPageRoute(builder: (_) => const WhatsNewPage()),
               );
             }),
           ]),

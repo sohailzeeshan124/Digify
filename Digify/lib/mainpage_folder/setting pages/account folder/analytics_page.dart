@@ -6,6 +6,7 @@ import 'package:digify/modal_classes/user_data.dart';
 import 'package:intl/intl.dart';
 import 'package:fl_chart/fl_chart.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'dart:math';
 
 class AnalyticsPage extends StatefulWidget {
   const AnalyticsPage({super.key});
@@ -15,7 +16,7 @@ class AnalyticsPage extends StatefulWidget {
 }
 
 class _AnalyticsPageState extends State<AnalyticsPage> {
-  final UserViewModel _vm = UserViewModel();
+  // final UserViewModel _vm = UserViewModel(); // Unused
   UserModel? _user;
   bool _loading = true;
   int _touchedIndex = -1;
@@ -44,23 +45,46 @@ class _AnalyticsPageState extends State<AnalyticsPage> {
 
   Future<void> _loadUser() async {
     setState(() => _loading = true);
-    final user = FirebaseAuth.instance.currentUser;
-    if (user == null) {
-      setState(() => _loading = false);
-      return;
-    }
-    try {
-      final u = await _vm.getUser(user.uid);
-      if (!mounted) return;
-      setState(() {
-        _user = u;
+
+    // MOCK DATA GENERATION
+    await Future.delayed(const Duration(milliseconds: 500)); // Simulate delay
+
+    final Random random = Random();
+    final DateTime now = DateTime.now();
+
+    List<DateTime> generateRandomDates(int count) {
+      return List.generate(count, (_) {
+        return now.subtract(Duration(
+          days: random.nextInt(365),
+          hours: random.nextInt(24),
+        ));
       });
-      _rebuildChart();
-    } catch (e) {
-      if (!mounted) return;
-    } finally {
-      if (mounted) setState(() => _loading = false);
     }
+
+    _user = UserModel(
+      uid: 'mock_uid',
+      email: 'mock@example.com',
+      username: 'Mock User',
+      fullName: 'Mock User',
+      dateOfBirth: DateTime(1990, 1, 1),
+      createdAt: DateTime(2023, 1, 1),
+      isGoogleDriveLinked: false,
+      pdfCreatedAt: generateRandomDates(50),
+      documentsSignedAt: generateRandomDates(30),
+      imagesToTextAt: generateRandomDates(40),
+      certificatesCreatedAt: generateRandomDates(20),
+
+      // Default empty/dummy values for required fields
+      friends: [],
+      serversJoined: [],
+      sessions: [],
+      serverRoles: {},
+    );
+
+    if (!mounted) return;
+    setState(() {});
+    _rebuildChart();
+    setState(() => _loading = false);
   }
 
   List<DateTime> _getDatesForCategory(UserModel u, String key) {
