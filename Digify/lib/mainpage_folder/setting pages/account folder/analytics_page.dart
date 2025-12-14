@@ -78,7 +78,7 @@ class _AnalyticsPageState extends State<AnalyticsPage> {
       friends: [],
       serversJoined: [],
       sessions: [],
-      serverRoles: {},
+      // serverRoles: {},
     );
 
     if (!mounted) return;

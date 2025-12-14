@@ -31,4 +31,8 @@ class UserViewModel {
   Future<void> addFriend(String currentUserId, String friendId) async {
     await _repo.addFriend(currentUserId, friendId);
   }
+
+  Future<void> addServerJoined(String userId, String communityId) async {
+    await _repo.addServerJoined(userId, communityId);
+  }
 }

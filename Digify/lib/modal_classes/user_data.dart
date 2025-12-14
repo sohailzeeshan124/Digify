@@ -37,8 +37,8 @@ class UserModel {
   // Example: [{ "device": "Pixel 7", "ip": "192.168.1.2", "loggedInAt": "..."}]
 
   // Role inside each server will be defined in ServerModel
-  Map<String, String> serverRoles;
-  // { "serverId1": "member", "serverId2": "admin" }
+  // Map<String, String> serverRoles;
+  // // { "serverId1": "member", "serverId2": "admin" }
 
   final bool isGoogleDriveLinked;
   final String? googleDriveEmail; // to show connected account
@@ -77,7 +77,7 @@ class UserModel {
     this.friends = const [],
     this.serversJoined = const [],
     this.sessions = const [],
-    this.serverRoles = const {},
+    // this.serverRoles = const {},
     required this.createdAt,
     this.lastLogin,
     required this.isGoogleDriveLinked,
@@ -138,7 +138,7 @@ class UserModel {
       friends: List<String>.from(data['friends'] ?? []),
       serversJoined: List<String>.from(data['serversJoined'] ?? []),
       sessions: List<Map<String, dynamic>>.from(data['sessions'] ?? []),
-      serverRoles: Map<String, String>.from(data['serverRoles'] ?? {}),
+      // serverRoles: Map<String, String>.from(data['serverRoles'] ?? {}),
       createdAt: (data['createdAt'] as Timestamp).toDate(),
       lastLogin: data['lastLogin'] != null
           ? (data['lastLogin'] as Timestamp).toDate()
@@ -177,7 +177,7 @@ class UserModel {
       'friends': friends,
       'serversJoined': serversJoined,
       'sessions': sessions,
-      'serverRoles': serverRoles,
+      // 'serverRoles': serverRoles,
       'createdAt': createdAt,
       'lastLogin': lastLogin,
       'isGoogleDriveLinked': isGoogleDriveLinked,

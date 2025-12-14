@@ -95,4 +95,10 @@ class UserRepository {
       'friends': FieldValue.arrayUnion([currentUserId])
     });
   }
+
+  Future<void> addServerJoined(String userId, String communityId) async {
+    await _firestore.collection(collection).doc(userId).update({
+      'serverjoined': FieldValue.arrayUnion([communityId])
+    });
+  }
 }
