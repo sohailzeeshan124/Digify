@@ -1,7 +1,9 @@
 import 'dart:io';
 
 import 'package:flutter/material.dart';
+import 'package:get_thumbnail_video/video_thumbnail.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:image/image.dart' hide Image;
 import 'package:image_picker/image_picker.dart';
 import 'package:digify/utils/app_colors.dart';
 import 'package:digify/services/pdf_generator_service.dart';
@@ -14,38 +16,70 @@ import 'package:package_info_plus/package_info_plus.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:digify/viewmodels/user_viewmodel.dart';
 import 'package:uuid/uuid.dart';
+import 'package:path_provider/path_provider.dart';
 
-class WorkingPhotocertificate extends StatefulWidget {
-  const WorkingPhotocertificate({super.key});
+class WorkingAudioCertificate extends StatefulWidget {
+  const WorkingAudioCertificate({super.key});
 
   @override
-  State<WorkingPhotocertificate> createState() =>
-      _WorkingPhotocertificateState();
+  State<WorkingAudioCertificate> createState() =>
+      _WorkingAudioCertificateState();
 }
 
-class _WorkingPhotocertificateState extends State<WorkingPhotocertificate> {
+class _WorkingAudioCertificateState extends State<WorkingAudioCertificate> {
   final PageController _pageController = PageController();
   int _currentStep = 0;
   final int _totalSteps = 3;
 
-  // Section 1 Data
-  final List<XFile> _selectedImages = [];
+  // Section 1: Video & Frames
+  XFile? _recordedVideo;
+  final List<String> _extractedFrames = []; // Paths to frame images
+  bool _isExtractingFrames = false;
   final ImagePicker _picker = ImagePicker();
 
-  // Section 2 Data
+  // Section 2: Attestation & Notes
   final TextEditingController _notesController = TextEditingController();
-  final TextEditingController _infoController = TextEditingController();
+  final TextEditingController _attestationNameController =
+      TextEditingController();
+  final TextEditingController _attestationStatementController =
+      TextEditingController();
 
-  // Section 3 Data
+  // Section 3: Finalize
   final TextEditingController _titleController = TextEditingController();
   final TextEditingController _nameController = TextEditingController();
   bool _addLocation = false;
 
   @override
+  void initState() {
+    super.initState();
+    final user = FirebaseAuth.instance.currentUser;
+    if (user != null) {
+      _attestationNameController.text = user.displayName ?? '';
+      _nameController.text = user.displayName ?? '';
+      _updateAttestationStatement();
+    }
+    _attestationNameController.addListener(_updateAttestationStatement);
+  }
+
+  void _updateAttestationStatement() {
+    final name = _attestationNameController.text.trim();
+    if (name.isNotEmpty) {
+      // Only update if user hasn't manually edited it heavily?
+      // For now, let's keep it simple and just set the default text if empty or similar.
+      if (_attestationStatementController.text.isEmpty ||
+          _attestationStatementController.text.contains("I, ")) {
+        _attestationStatementController.text =
+            "I, $name, hereby attest that I made this voice note and testimonial voluntarily and that the information contained herein is true and accurate.";
+      }
+    }
+  }
+
+  @override
   void dispose() {
     _pageController.dispose();
     _notesController.dispose();
-    _infoController.dispose();
+    _attestationNameController.dispose();
+    _attestationStatementController.dispose();
     _titleController.dispose();
     _nameController.dispose();
     super.dispose();
@@ -85,17 +119,11 @@ class _WorkingPhotocertificateState extends State<WorkingPhotocertificate> {
     );
 
     try {
-      print('Starting report generation...');
       final user = FirebaseAuth.instance.currentUser;
-      if (user == null) {
-        throw Exception('User not logged in');
-      }
+      if (user == null) throw Exception('User not logged in');
 
       // 1. Gather Data
-      print('Fetching device data...');
       final deviceData = await _fetchDeviceData();
-
-      print('Fetching location data...');
       final locationData = _addLocation ? await _fetchLocationData() : null;
 
       final userData = {
@@ -104,31 +132,26 @@ class _WorkingPhotocertificateState extends State<WorkingPhotocertificate> {
         'uid': user.uid,
       };
 
-      // Generate a unique ID for the certificate.
       final certDocId = const Uuid().v4();
-      print("DEBUG: Generated Certificate ID: '$certDocId'");
-
-      // Fetch App Name
       final packageInfo = await PackageInfo.fromPlatform();
       final appName = packageInfo.appName;
 
-      // Fetch Signature Path
       String? signaturePath;
       try {
         final userViewModel = UserViewModel();
         final userDataModel = await userViewModel.getUser(user.uid);
         signaturePath = userDataModel?.signatureLocalPath;
       } catch (e) {
-        print('Error fetching signature path: $e');
+        print('Error fetching signature: $e');
       }
 
       // 2. Generate PDF
-      print('Generating PDF...');
-      final pdfBytes = await PdfGeneratorService().generateReport(
+      // Note: We need to implement generateAudioReport in PdfGeneratorService
+      final pdfBytes = await PdfGeneratorService().generateAudioReport(
         title: _titleController.text,
-        images: _selectedImages.map((x) => File(x.path)).toList(),
+        frameImages: _extractedFrames.map((e) => File(e)).toList(),
+        attestationStatement: _attestationStatementController.text,
         additionalNotes: _notesController.text,
-        importantInfo: _infoController.text,
         userData: userData,
         deviceData: deviceData,
         locationData: locationData,
@@ -137,13 +160,11 @@ class _WorkingPhotocertificateState extends State<WorkingPhotocertificate> {
         appName: appName,
       );
 
-      // 3. Upload PDF to Cloudinary
-      print('Uploading to Cloudinary...');
+      // 3. Upload & Save (Same logic as Photo Certificate)
       final tempDir = await Directory.systemTemp.createTemp();
       final tempFile = File('${tempDir.path}/certificate_$certDocId.pdf');
       await tempFile.writeAsBytes(pdfBytes);
 
-      // Save locally
       final localDir =
           Directory('/storage/emulated/0/Documents/generated_certificate');
       if (!await localDir.exists()) {
@@ -157,9 +178,8 @@ class _WorkingPhotocertificateState extends State<WorkingPhotocertificate> {
           folder: 'digify/certificates');
 
       if (response == null || response.secureUrl == null) {
-        throw Exception('Failed to upload PDF to Cloudinary');
+        throw Exception('Failed to upload PDF');
       }
-      print('Upload successful: ${response.secureUrl}');
 
       // 4. Create Certificate Model
       final certificate = CertificateModel(
@@ -179,7 +199,6 @@ class _WorkingPhotocertificateState extends State<WorkingPhotocertificate> {
       );
 
       // 5. Save to Firestore
-      print('Saving to Firestore...');
       final viewModel = CertificateViewModel();
       await viewModel.finalizeSignature(certificate);
 
@@ -187,31 +206,19 @@ class _WorkingPhotocertificateState extends State<WorkingPhotocertificate> {
         throw Exception(viewModel.errorMessage);
       }
 
-      // Close loading dialog
       if (mounted) {
-        Navigator.of(context).pop();
-      }
-
-      if (mounted) {
+        Navigator.pop(context); // Close loading
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Text('Report Generated and Saved Successfully!'),
             backgroundColor: Colors.green,
           ),
         );
-        // Navigate back or show success dialog
-        Navigator.pop(context);
+        Navigator.pop(context); // Close screen
       }
-    } catch (e, stackTrace) {
-      print('Error generating report: $e');
-      print(stackTrace);
-
-      // Close loading dialog if open
+    } catch (e) {
       if (mounted) {
-        Navigator.of(context).pop();
-      }
-
-      if (mounted) {
+        Navigator.pop(context); // Close loading
         showDialog(
           context: context,
           builder: (context) => AlertDialog(
@@ -219,9 +226,8 @@ class _WorkingPhotocertificateState extends State<WorkingPhotocertificate> {
             content: Text('Failed to generate report: $e'),
             actions: [
               TextButton(
-                onPressed: () => Navigator.pop(context),
-                child: const Text('OK'),
-              ),
+                  onPressed: () => Navigator.pop(context),
+                  child: const Text('OK'))
             ],
           ),
         );
@@ -237,75 +243,31 @@ class _WorkingPhotocertificateState extends State<WorkingPhotocertificate> {
       'version': packageInfo.version,
     };
 
-    try {
-      if (Platform.isAndroid) {
-        final androidInfo = await deviceInfoPlugin.androidInfo;
-        deviceData['model'] = '${androidInfo.brand} ${androidInfo.model}';
-        deviceData['os'] = 'Android';
-        deviceData['osVersion'] = androidInfo.version.release;
-      } else if (Platform.isIOS) {
-        final iosInfo = await deviceInfoPlugin.iosInfo;
-        deviceData['model'] = '${iosInfo.name} ${iosInfo.model}';
-        deviceData['os'] = 'iOS';
-        deviceData['osVersion'] = iosInfo.systemVersion;
-      } else {
-        deviceData['model'] = 'Unknown';
-        deviceData['os'] = Platform.operatingSystem;
-        deviceData['osVersion'] = Platform.operatingSystemVersion;
-      }
-
-      // IP Address - Add timeout to prevent hanging
-      try {
-        await Future.any([
-          _getIpAddress(deviceData),
-          Future.delayed(const Duration(seconds: 2)),
-        ]);
-      } catch (e) {
-        print('Timeout or error fetching IP: $e');
-        deviceData['ip'] = 'Unknown';
-      }
-    } catch (e) {
-      print('Error fetching device info: $e');
+    if (Platform.isAndroid) {
+      final androidInfo = await deviceInfoPlugin.androidInfo;
+      deviceData['model'] = '${androidInfo.brand} ${androidInfo.model}';
+      deviceData['os'] = 'Android';
+      deviceData['osVersion'] = androidInfo.version.release;
+    } else if (Platform.isIOS) {
+      final iosInfo = await deviceInfoPlugin.iosInfo;
+      deviceData['model'] = '${iosInfo.name} ${iosInfo.model}';
+      deviceData['os'] = 'iOS';
+      deviceData['osVersion'] = iosInfo.systemVersion;
     }
     return deviceData;
   }
 
-  Future<void> _getIpAddress(Map<String, String> deviceData) async {
-    try {
-      for (var interface in await NetworkInterface.list()) {
-        for (var addr in interface.addresses) {
-          if (addr.type == InternetAddressType.IPv4 && !addr.isLoopback) {
-            deviceData['ip'] = addr.address;
-            return;
-          }
-        }
-      }
-    } catch (e) {
-      print('Error getting IP: $e');
-    }
-  }
-
   Future<Map<String, dynamic>?> _fetchLocationData() async {
     try {
-      bool serviceEnabled;
-      LocationPermission permission;
+      bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
+      if (!serviceEnabled) return null;
 
-      serviceEnabled = await Geolocator.isLocationServiceEnabled();
-      if (!serviceEnabled) {
-        return null;
-      }
-
-      permission = await Geolocator.checkPermission();
+      LocationPermission permission = await Geolocator.checkPermission();
       if (permission == LocationPermission.denied) {
         permission = await Geolocator.requestPermission();
-        if (permission == LocationPermission.denied) {
-          return null;
-        }
+        if (permission == LocationPermission.denied) return null;
       }
-
-      if (permission == LocationPermission.deniedForever) {
-        return null;
-      }
+      if (permission == LocationPermission.deniedForever) return null;
 
       final position = await Geolocator.getCurrentPosition();
       return {
@@ -313,7 +275,6 @@ class _WorkingPhotocertificateState extends State<WorkingPhotocertificate> {
         'longitude': position.longitude,
       };
     } catch (e) {
-      print('Error fetching location: $e');
       return null;
     }
   }
@@ -332,22 +293,22 @@ class _WorkingPhotocertificateState extends State<WorkingPhotocertificate> {
 
   bool _validateCurrentStep() {
     if (_currentStep == 0) {
-      if (_selectedImages.isEmpty) {
+      if (_recordedVideo == null) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Please select at least one image.')),
+          const SnackBar(content: Text('Please record a video first.')),
         );
         return false;
       }
     } else if (_currentStep == 1) {
-      if (_notesController.text.trim().isEmpty) {
+      if (_attestationNameController.text.isEmpty ||
+          _attestationStatementController.text.isEmpty) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Please enter additional notes.')),
+          const SnackBar(content: Text('Please complete the attestation.')),
         );
         return false;
       }
     } else if (_currentStep == 2) {
-      if (_titleController.text.trim().isEmpty ||
-          _nameController.text.trim().isEmpty) {
+      if (_titleController.text.isEmpty || _nameController.text.isEmpty) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('Please fill in all fields.')),
         );
@@ -357,29 +318,62 @@ class _WorkingPhotocertificateState extends State<WorkingPhotocertificate> {
     return true;
   }
 
-  Future<void> _pickImage(ImageSource source) async {
+  Future<void> _recordVideo() async {
     try {
-      final XFile? image = await _picker.pickImage(source: source);
-      if (image != null) {
+      final XFile? video = await _picker.pickVideo(
+          source: ImageSource.camera, maxDuration: const Duration(minutes: 2));
+      if (video != null) {
         setState(() {
-          _selectedImages.add(image);
+          _recordedVideo = video;
+          _isExtractingFrames = true;
+          _extractedFrames.clear();
+        });
+        await _extractFrames(video.path);
+        setState(() {
+          _isExtractingFrames = false;
         });
       }
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error picking image: $e')),
+        SnackBar(content: Text('Error recording video: $e')),
       );
+    }
+  }
+
+  Future<void> _extractFrames(String videoPath) async {
+    try {
+      // Extract 3 frames at different intervals (e.g., 20%, 50%, 80%)
+      // Note: VideoThumbnail might take time (ms).
+      // We'll just take a few frames based on time if possible, or just standard thumbnails.
+      // Since we don't know duration easily without another plugin, we'll try to take one at 1000ms, 3000ms, 5000ms?
+      // Or just timeMs 0?
+      // Let's try to get a few.
+
+      final tempDir = await getTemporaryDirectory();
+
+      for (int i = 1; i <= 3; i++) {
+        final path = await VideoThumbnail.thumbnailFile(
+          video: videoPath,
+          thumbnailPath: tempDir.path,
+          // imageFormat: ImageFormat.JPEG, // Removed to use default or fix error
+          timeMs: i * 2000, // 2s, 4s, 6s
+          quality: 75,
+        );
+        _extractedFrames.add(path as String);
+      }
+    } catch (e) {
+      print("Error extracting frames: $e");
     }
   }
 
   String _getSectionTitle() {
     switch (_currentStep) {
       case 0:
-        return 'Select Images';
+        return 'Record Video';
       case 1:
-        return 'Additional Information';
+        return 'Attestation';
       case 2:
-        return 'Finalize Certificate';
+        return 'Finalize';
       default:
         return '';
     }
@@ -389,7 +383,7 @@ class _WorkingPhotocertificateState extends State<WorkingPhotocertificate> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Create Photo Certificate'),
+        title: const Text('Create Audio Certificate'),
         backgroundColor: AppColors.primaryGreen,
         iconTheme: const IconThemeData(color: Colors.white),
         titleTextStyle: const TextStyle(
@@ -403,7 +397,7 @@ class _WorkingPhotocertificateState extends State<WorkingPhotocertificate> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 const Text(
-                  'Acquire and degify photos in real time',
+                  'Record testimonial and certify authenticity',
                   style: TextStyle(
                     fontSize: 18,
                     fontWeight: FontWeight.bold,
@@ -411,51 +405,6 @@ class _WorkingPhotocertificateState extends State<WorkingPhotocertificate> {
                   ),
                 ),
                 const SizedBox(height: 16),
-                // Hero Section Icons
-                Container(
-                  width: double.infinity,
-                  padding:
-                      const EdgeInsets.symmetric(vertical: 20, horizontal: 20),
-                  decoration: BoxDecoration(
-                    color: AppColors.primaryGreen,
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceAround,
-                    children: [
-                      Icon(Icons.mail_outline,
-                          color: Colors.white.withOpacity(0.5)),
-                      Icon(Icons.graphic_eq,
-                          color: Colors.white.withOpacity(0.5)),
-                      Icon(Icons.play_arrow,
-                          color: Colors.white.withOpacity(0.5)),
-                      Container(
-                        padding: const EdgeInsets.all(8),
-                        decoration: BoxDecoration(
-                          border: Border.all(color: Colors.white, width: 2),
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                        child: const Icon(Icons.camera_alt,
-                            color: Colors.white, size: 30),
-                      ),
-                      Icon(Icons.folder_open,
-                          color: Colors.white.withOpacity(0.5)),
-                      Icon(Icons.qr_code_scanner,
-                          color: Colors.white.withOpacity(0.5)),
-                      Icon(Icons.location_on_outlined,
-                          color: Colors.white.withOpacity(0.5)),
-                    ],
-                  ),
-                ),
-                const SizedBox(height: 20),
-                Text(
-                  _getSectionTitle(),
-                  style: const TextStyle(
-                    fontSize: 20,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-                const SizedBox(height: 10),
                 // Progress Bar
                 Row(
                   children: List.generate(_totalSteps, (index) {
@@ -468,13 +417,17 @@ class _WorkingPhotocertificateState extends State<WorkingPhotocertificate> {
                               ? AppColors.primaryGreen
                               : Colors.grey.shade300,
                           borderRadius: BorderRadius.circular(6),
-                          border: Border.all(
-                              color: Colors.black87,
-                              width: 2), // thicker border
+                          border: Border.all(color: Colors.black87, width: 2),
                         ),
                       ),
                     );
                   }),
+                ),
+                const SizedBox(height: 10),
+                Text(
+                  _getSectionTitle(),
+                  style: const TextStyle(
+                      fontSize: 20, fontWeight: FontWeight.bold),
                 ),
               ],
             ),
@@ -498,70 +451,68 @@ class _WorkingPhotocertificateState extends State<WorkingPhotocertificate> {
 
   Widget _buildSection1() {
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16.0),
+      padding: const EdgeInsets.all(16.0),
       child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text('Choose images from gallery or take a new photo.'),
-          const SizedBox(height: 20),
-          Row(
-            children: [
-              Expanded(
-                child: _buildUploadButton(
-                  onPressed: () => _pickImage(ImageSource.camera),
-                  text: 'Camera',
-                  icon: Icons.camera_alt,
-                ),
-              ),
-              const SizedBox(width: 10),
-              Expanded(
-                child: _buildUploadButton(
-                  onPressed: () => _pickImage(ImageSource.gallery),
-                  text: 'Gallery',
-                  icon: Icons.photo_library,
-                ),
-              ),
-            ],
+          _buildUploadButton(
+            onPressed: _recordVideo,
+            text: _recordedVideo == null ? 'Record Video' : 'Record Again',
+            icon: Icons.videocam,
           ),
           const SizedBox(height: 20),
-          Expanded(
-            child: _selectedImages.isEmpty
-                ? const Center(child: Text('No images selected'))
-                : GridView.builder(
-                    gridDelegate:
-                        const SliverGridDelegateWithFixedCrossAxisCount(
-                      crossAxisCount: 3,
-                      crossAxisSpacing: 8,
-                      mainAxisSpacing: 8,
+          if (_isExtractingFrames)
+            const Column(
+              children: [
+                CircularProgressIndicator(),
+                SizedBox(height: 10),
+                Text("Processing video and extracting frames..."),
+              ],
+            )
+          else if (_extractedFrames.isNotEmpty)
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text("Extracted Frames:",
+                      style: TextStyle(fontWeight: FontWeight.bold)),
+                  const SizedBox(height: 10),
+                  Expanded(
+                    child: GridView.builder(
+                      gridDelegate:
+                          const SliverGridDelegateWithFixedCrossAxisCount(
+                        crossAxisCount: 3,
+                        crossAxisSpacing: 8,
+                        mainAxisSpacing: 8,
+                      ),
+                      itemCount: _extractedFrames.length,
+                      itemBuilder: (context, index) {
+                        return Image.file(
+                          File(_extractedFrames[index]),
+                          fit: BoxFit.cover,
+                        );
+                      },
                     ),
-                    itemCount: _selectedImages.length,
-                    itemBuilder: (context, index) {
-                      return Stack(
-                        children: [
-                          Image.file(
-                            File(_selectedImages[index].path),
-                            fit: BoxFit.cover,
-                            width: double.infinity,
-                            height: double.infinity,
-                          ),
-                          Positioned(
-                            top: 0,
-                            right: 0,
-                            child: IconButton(
-                              icon: const Icon(Icons.remove_circle,
-                                  color: Colors.red),
-                              onPressed: () {
-                                setState(() {
-                                  _selectedImages.removeAt(index);
-                                });
-                              },
-                            ),
-                          ),
-                        ],
-                      );
-                    },
                   ),
-          ),
+                ],
+              ),
+            )
+          else if (_recordedVideo != null)
+            const Text("Video recorded but no frames extracted.")
+          else
+            const Expanded(
+              child: Center(
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(Icons.video_library_outlined,
+                        size: 64, color: Colors.grey),
+                    SizedBox(height: 10),
+                    Text("No video recorded yet",
+                        style: TextStyle(color: Colors.grey)),
+                  ],
+                ),
+              ),
+            ),
         ],
       ),
     );
@@ -569,28 +520,44 @@ class _WorkingPhotocertificateState extends State<WorkingPhotocertificate> {
 
   Widget _buildSection2() {
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16.0),
+      padding: const EdgeInsets.all(16.0),
       child: SingleChildScrollView(
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
+            const Text(
+              "Attestation of Authenticity",
+              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+            ),
             const SizedBox(height: 20),
             TextField(
-              controller: _notesController,
+              controller: _attestationNameController,
               decoration: const InputDecoration(
-                labelText: 'Additional Notes',
+                labelText: 'Full Name',
                 border: OutlineInputBorder(),
-                alignLabelWithHint: true,
+              ),
+            ),
+            const SizedBox(height: 20),
+            TextField(
+              controller: _attestationStatementController,
+              decoration: const InputDecoration(
+                labelText: 'Attestation Statement',
+                border: OutlineInputBorder(),
+                hintText:
+                    "I, [Name], hereby attest that I made this voice note...",
               ),
               maxLines: 5,
             ),
             const SizedBox(height: 20),
+            const Divider(),
+            const SizedBox(height: 10),
             TextField(
-              controller: _infoController,
+              controller: _notesController,
               decoration: const InputDecoration(
-                labelText: 'Important Information',
+                labelText: 'Additional Notes (Optional)',
                 border: OutlineInputBorder(),
               ),
+              maxLines: 3,
             ),
           ],
         ),
@@ -600,7 +567,7 @@ class _WorkingPhotocertificateState extends State<WorkingPhotocertificate> {
 
   Widget _buildSection3() {
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16.0),
+      padding: const EdgeInsets.all(16.0),
       child: SingleChildScrollView(
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,

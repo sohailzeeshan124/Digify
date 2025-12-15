@@ -112,6 +112,142 @@ class PdfGeneratorService {
     return pdf.save();
   }
 
+  Future<Uint8List> generateAudioReport({
+    required String title,
+    required List<File> frameImages,
+    required String attestationStatement,
+    required String additionalNotes,
+    required Map<String, String> userData,
+    required Map<String, String> deviceData,
+    required Map<String, dynamic>? locationData,
+    required String certificateId,
+    required String? signaturePath,
+    required String appName,
+  }) async {
+    final pdf = pw.Document();
+    pw.Font font;
+    pw.Font boldFont;
+
+    try {
+      font = await PdfGoogleFonts.poppinsRegular();
+      boldFont = await PdfGoogleFonts.poppinsBold();
+    } catch (e) {
+      print('Error loading Google Fonts: $e');
+      font = pw.Font.courier();
+      boldFont = pw.Font.courierBold();
+    }
+
+    // Load images (frames)
+    final List<pw.MemoryImage> pdfImages = [];
+    for (var file in frameImages) {
+      final imageBytes = await file.readAsBytes();
+      pdfImages.add(pw.MemoryImage(imageBytes));
+    }
+
+    // Load Signature
+    pw.MemoryImage? signatureImage;
+    if (signaturePath != null) {
+      final sigFile = File(signaturePath);
+      if (await sigFile.exists()) {
+        final sigBytes = await sigFile.readAsBytes();
+        signatureImage = pw.MemoryImage(sigBytes);
+      }
+    }
+
+    // Load Map Snapshot
+    pw.MemoryImage? mapImage;
+    if (locationData != null) {
+      try {
+        final double lat = locationData['latitude'];
+        final double lng = locationData['longitude'];
+        final mapUrl =
+            'https://staticmap.openstreetmap.de/staticmap.php?center=$lat,$lng&zoom=15&size=600x300&maptype=mapnik&markers=$lat,$lng,red-pushpin';
+        final response = await http.get(Uri.parse(mapUrl));
+        if (response.statusCode == 200) {
+          mapImage = pw.MemoryImage(response.bodyBytes);
+        }
+      } catch (e) {
+        print('Error loading map image: $e');
+      }
+    }
+
+    final primaryColor = PdfColor.fromInt(0xFF274A31);
+    final dateFormat = DateFormat('MMMM dd, yyyy - hh:mm a');
+    final formattedDate = dateFormat.format(DateTime.now());
+
+    pdf.addPage(
+      pw.MultiPage(
+        pageTheme: pw.PageTheme(
+          pageFormat: PdfPageFormat.a4,
+          margin: const pw.EdgeInsets.all(32),
+          theme: pw.ThemeData.withFont(base: font, bold: boldFont),
+        ),
+        header: (context) =>
+            _buildHeader(title, formattedDate, boldFont, font, primaryColor),
+        footer: (context) => _buildFooter(context, font, primaryColor),
+        build: (context) => [
+          _buildTestimonialSection(
+              pdfImages, attestationStatement, boldFont, font, primaryColor),
+          pw.SizedBox(height: 20),
+          _buildNotesSection(additionalNotes, '', boldFont, primaryColor),
+          pw.SizedBox(height: 20),
+          _buildSignatureSection(signatureImage, boldFont, primaryColor),
+          pw.SizedBox(height: 20),
+          _buildUserDetailsTable(userData, boldFont, font, primaryColor),
+          pw.SizedBox(height: 20),
+          _buildDeviceDetailsTable(
+              deviceData, appName, boldFont, font, primaryColor),
+          if (locationData != null) ...[
+            pw.SizedBox(height: 20),
+            _buildGeolocationSection(
+                locationData, mapImage, boldFont, primaryColor),
+          ],
+          pw.SizedBox(height: 20),
+          _buildQrCodeSection(certificateId, boldFont, primaryColor),
+        ],
+      ),
+    );
+
+    return pdf.save();
+  }
+
+  pw.Widget _buildTestimonialSection(List<pw.MemoryImage> images,
+      String statement, pw.Font boldFont, pw.Font font, PdfColor primaryColor) {
+    return pw.Column(
+      crossAxisAlignment: pw.CrossAxisAlignment.start,
+      children: [
+        pw.Text('Video Testimonial Frames',
+            style: pw.TextStyle(
+                font: boldFont,
+                fontSize: 16,
+                fontWeight: pw.FontWeight.bold,
+                color: primaryColor)),
+        pw.SizedBox(height: 10),
+        _buildImagesSection(images),
+        pw.SizedBox(height: 20),
+        pw.Text('Attestation Statement',
+            style: pw.TextStyle(
+                font: boldFont,
+                fontSize: 16,
+                fontWeight: pw.FontWeight.bold,
+                color: primaryColor)),
+        pw.SizedBox(height: 10),
+        pw.Container(
+          padding: const pw.EdgeInsets.all(10),
+          decoration: pw.BoxDecoration(
+            border: pw.Border.all(color: PdfColors.grey300),
+            borderRadius: pw.BorderRadius.circular(5),
+            color: PdfColors.grey50,
+          ),
+          child: pw.Text(
+            statement,
+            style: pw.TextStyle(font: font, fontStyle: pw.FontStyle.italic),
+          ),
+        ),
+      ],
+    );
+  }
+
   pw.Widget _buildHeader(String title, String date, pw.Font boldFont,
       pw.Font font, PdfColor primaryColor) {
     return pw.Column(
@@ -405,5 +541,339 @@ class PdfGeneratorService {
         ),
       ],
     );
+  }
+
+  Future<Uint8List> generatePurchaseReport({
+    required String itemName,
+    required String itemPrice,
+    required String itemQuantity,
+    required String shopName,
+    required String shopLocation,
+    required String testimony,
+    required String buyerName,
+    required File? itemImage,
+    required File? receiptImage,
+    required Map<String, String> userData,
+    required Map<String, String> deviceData,
+    required Map<String, dynamic>? locationData,
+    required String certificateId,
+    required String? signaturePath,
+    required String appName,
+  }) async {
+    final pdf = pw.Document();
+    pw.Font font;
+    pw.Font boldFont;
+
+    try {
+      font = await PdfGoogleFonts.poppinsRegular();
+      boldFont = await PdfGoogleFonts.poppinsBold();
+    } catch (e) {
+      print('Error loading Google Fonts: $e');
+      font = pw.Font.courier();
+      boldFont = pw.Font.courierBold();
+    }
+
+    // Load Images
+    pw.MemoryImage? pdfItemImage;
+    if (itemImage != null) {
+      final imageBytes = await itemImage.readAsBytes();
+      pdfItemImage = pw.MemoryImage(imageBytes);
+    }
+    pw.MemoryImage? pdfReceiptImage;
+    if (receiptImage != null) {
+      final imageBytes = await receiptImage.readAsBytes();
+      pdfReceiptImage = pw.MemoryImage(imageBytes);
+    }
+
+    // Load Signature
+    pw.MemoryImage? signatureImage;
+    if (signaturePath != null) {
+      final sigFile = File(signaturePath);
+      if (await sigFile.exists()) {
+        final sigBytes = await sigFile.readAsBytes();
+        signatureImage = pw.MemoryImage(sigBytes);
+      }
+    }
+
+    // Load Map Snapshot
+    pw.MemoryImage? mapImage;
+    if (locationData != null) {
+      try {
+        final double lat = locationData['latitude'];
+        final double lng = locationData['longitude'];
+        final mapUrl =
+            'https://staticmap.openstreetmap.de/staticmap.php?center=$lat,$lng&zoom=15&size=600x300&maptype=mapnik&markers=$lat,$lng,red-pushpin';
+        final response = await http.get(Uri.parse(mapUrl));
+        if (response.statusCode == 200) {
+          mapImage = pw.MemoryImage(response.bodyBytes);
+        }
+      } catch (e) {
+        print('Error loading map image: $e');
+      }
+    }
+
+    final primaryColor = PdfColor.fromInt(0xFF274A31);
+    final dateFormat = DateFormat('MMMM dd, yyyy - hh:mm a');
+    final formattedDate = dateFormat.format(DateTime.now());
+
+    pdf.addPage(
+      pw.MultiPage(
+        pageTheme: pw.PageTheme(
+          pageFormat: PdfPageFormat.a4,
+          margin: const pw.EdgeInsets.all(32),
+          theme: pw.ThemeData.withFont(base: font, bold: boldFont),
+        ),
+        header: (context) => _buildHeader('Purchase Verification',
+            formattedDate, boldFont, font, primaryColor),
+        footer: (context) => _buildFooter(context, font, primaryColor),
+        build: (context) => [
+          _buildPurchaseImagesSection(
+              pdfItemImage, pdfReceiptImage, boldFont, font, primaryColor),
+          pw.SizedBox(height: 20),
+          _buildPurchaseDetailsSection(itemName, itemPrice, itemQuantity,
+              shopName, shopLocation, boldFont, font, primaryColor),
+          pw.SizedBox(height: 20),
+          _buildTestimonySection(
+              testimony, buyerName, boldFont, font, primaryColor),
+          pw.SizedBox(height: 20),
+          _buildSignatureSection(signatureImage, boldFont, primaryColor),
+          pw.SizedBox(height: 20),
+          _buildUserDetailsTable(userData, boldFont, font, primaryColor),
+          pw.SizedBox(height: 20),
+          _buildDeviceDetailsTable(
+              deviceData, appName, boldFont, font, primaryColor),
+          if (locationData != null) ...[
+            pw.SizedBox(height: 20),
+            _buildGeolocationSection(
+                locationData, mapImage, boldFont, primaryColor),
+          ],
+          pw.SizedBox(height: 20),
+          _buildQrCodeSection(certificateId, boldFont, primaryColor),
+        ],
+      ),
+    );
+
+    return pdf.save();
+  }
+
+  pw.Widget _buildPurchaseImagesSection(
+      pw.MemoryImage? itemImg,
+      pw.MemoryImage? receiptImg,
+      pw.Font boldFont,
+      pw.Font font,
+      PdfColor primaryColor) {
+    return pw.Row(
+      crossAxisAlignment: pw.CrossAxisAlignment.start,
+      children: [
+        if (itemImg != null)
+          pw.Expanded(
+            child: pw.Column(
+              children: [
+                pw.Text('Item Image',
+                    style: pw.TextStyle(
+                        font: boldFont,
+                        fontWeight: pw.FontWeight.bold,
+                        color: primaryColor)),
+                pw.SizedBox(height: 5),
+                pw.Container(
+                  height: 150,
+                  child: pw.Image(itemImg, fit: pw.BoxFit.contain),
+                ),
+              ],
+            ),
+          ),
+        if (itemImg != null && receiptImg != null) pw.SizedBox(width: 20),
+        if (receiptImg != null)
+          pw.Expanded(
+            child: pw.Column(
+              children: [
+                pw.Text('Receipt Image',
+                    style: pw.TextStyle(
+                        font: boldFont,
+                        fontWeight: pw.FontWeight.bold,
+                        color: primaryColor)),
+                pw.SizedBox(height: 5),
+                pw.Container(
+                  height: 150,
+                  child: pw.Image(receiptImg, fit: pw.BoxFit.contain),
+                ),
+              ],
+            ),
+          ),
+      ],
+    );
+  }
+
+  pw.Widget _buildPurchaseDetailsSection(
+      String name,
+      String price,
+      String qty,
+      String shop,
+      String loc,
+      pw.Font boldFont,
+      pw.Font font,
+      PdfColor primaryColor) {
+    return pw.Column(
+      crossAxisAlignment: pw.CrossAxisAlignment.start,
+      children: [
+        pw.Text('Purchase Details',
+            style: pw.TextStyle(
+                font: boldFont,
+                fontSize: 16,
+                fontWeight: pw.FontWeight.bold,
+                color: primaryColor)),
+        pw.SizedBox(height: 10),
+        pw.Table(
+          border: pw.TableBorder.all(color: PdfColors.grey300),
+          children: [
+            _buildTableRow('Item Name', name, boldFont, font, primaryColor),
+            _buildTableRow('Price', price, boldFont, font, primaryColor),
+            _buildTableRow('Quantity', qty, boldFont, font, primaryColor),
+            _buildTableRow('Shop Name', shop, boldFont, font, primaryColor),
+            _buildTableRow('Shop Location', loc, boldFont, font, primaryColor),
+          ],
+        ),
+      ],
+    );
+  }
+
+  pw.Widget _buildTestimonySection(String testimony, String buyer,
+      pw.Font boldFont, pw.Font font, PdfColor primaryColor) {
+    return pw.Column(
+      crossAxisAlignment: pw.CrossAxisAlignment.start,
+      children: [
+        pw.Text("Buyer's Testimony",
+            style: pw.TextStyle(
+                font: boldFont,
+                fontSize: 16,
+                fontWeight: pw.FontWeight.bold,
+                color: primaryColor)),
+        pw.SizedBox(height: 10),
+        pw.Container(
+            padding: const pw.EdgeInsets.all(10),
+            decoration: pw.BoxDecoration(
+              border: pw.Border.all(color: PdfColors.grey300),
+              borderRadius: pw.BorderRadius.circular(5),
+              color: PdfColors.grey50,
+            ),
+            child: pw.Column(
+                crossAxisAlignment: pw.CrossAxisAlignment.start,
+                children: [
+                  pw.Text(
+                    testimony,
+                    style: pw.TextStyle(
+                        font: font, fontStyle: pw.FontStyle.italic),
+                  ),
+                  pw.SizedBox(height: 10),
+                  pw.Align(
+                    alignment: pw.Alignment.centerRight,
+                    child: pw.Text("- $buyer",
+                        style: pw.TextStyle(font: boldFont)),
+                  )
+                ])),
+      ],
+    );
+  }
+
+  Future<Uint8List> generateVideoReport({
+    required String title,
+    required List<File> frameImages,
+    required String attestationStatement,
+    required String additionalNotes,
+    required Map<String, String> userData,
+    required Map<String, String> deviceData,
+    required Map<String, dynamic>? locationData,
+    required String certificateId,
+    required String? signaturePath,
+    required String appName,
+  }) async {
+    final pdf = pw.Document();
+    pw.Font font;
+    pw.Font boldFont;
+
+    try {
+      font = await PdfGoogleFonts.poppinsRegular();
+      boldFont = await PdfGoogleFonts.poppinsBold();
+    } catch (e) {
+      print('Error loading Google Fonts: $e');
+      font = pw.Font.courier();
+      boldFont = pw.Font.courierBold();
+    }
+
+    // Load Frame Images
+    List<pw.MemoryImage> pdfFrameImages = [];
+    for (var file in frameImages) {
+      final imageBytes = await file.readAsBytes();
+      pdfFrameImages.add(pw.MemoryImage(imageBytes));
+    }
+
+    // Load Signature
+    pw.MemoryImage? signatureImage;
+    if (signaturePath != null) {
+      final sigFile = File(signaturePath);
+      if (await sigFile.exists()) {
+        final sigBytes = await sigFile.readAsBytes();
+        signatureImage = pw.MemoryImage(sigBytes);
+      }
+    }
+
+    // Load Map Snapshot
+    pw.MemoryImage? mapImage;
+    if (locationData != null) {
+      try {
+        final double lat = locationData['latitude'];
+        final double lng = locationData['longitude'];
+        final mapUrl =
+            'https://staticmap.openstreetmap.de/staticmap.php?center=$lat,$lng&zoom=15&size=600x300&maptype=mapnik&markers=$lat,$lng,red-pushpin';
+        final response = await http.get(Uri.parse(mapUrl));
+        if (response.statusCode == 200) {
+          mapImage = pw.MemoryImage(response.bodyBytes);
+        }
+      } catch (e) {
+        print('Error loading map image: $e');
+      }
+    }
+
+    final primaryColor = PdfColor.fromInt(0xFF274A31);
+    final dateFormat = DateFormat('MMMM dd, yyyy - hh:mm a');
+    final formattedDate = dateFormat.format(DateTime.now());
+
+    pdf.addPage(
+      pw.MultiPage(
+        pageTheme: pw.PageTheme(
+          pageFormat: PdfPageFormat.a4,
+          margin: const pw.EdgeInsets.all(32),
+          theme: pw.ThemeData.withFont(base: font, bold: boldFont),
+        ),
+        header: (context) => _buildHeader('Video Verification', formattedDate,
+            boldFont, font, primaryColor), // Changed Header
+        footer: (context) => _buildFooter(context, font, primaryColor),
+        build: (context) => [
+          _buildTestimonialSection(pdfFrameImages, attestationStatement,
+              boldFont, font, primaryColor),
+          if (additionalNotes.isNotEmpty) ...[
+            pw.SizedBox(height: 20),
+            _buildNotesSection(additionalNotes, "", font,
+                primaryColor), // Info is empty for now
+          ],
+          pw.SizedBox(height: 20),
+          _buildSignatureSection(signatureImage, boldFont, primaryColor),
+          pw.SizedBox(height: 20),
+          _buildUserDetailsTable(userData, boldFont, font, primaryColor),
+          pw.SizedBox(height: 20),
+          _buildDeviceDetailsTable(
+              deviceData, appName, boldFont, font, primaryColor),
+          if (locationData != null) ...[
+            pw.SizedBox(height: 20),
+            _buildGeolocationSection(
+                locationData, mapImage, boldFont, primaryColor),
+          ],
+          pw.SizedBox(height: 20),
+          _buildQrCodeSection(certificateId, boldFont, primaryColor),
+        ],
+      ),
+    );
+
+    return pdf.save();
   }
 }

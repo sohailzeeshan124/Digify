@@ -54,7 +54,7 @@ class CloudinaryRepository {
       final response = await cloudinary.uploadResource(
         CloudinaryUploadResource(
           filePath: filePath,
-          resourceType: CloudinaryResourceType.auto,
+          resourceType: CloudinaryResourceType.raw,
           folder: folder,
         ),
       );

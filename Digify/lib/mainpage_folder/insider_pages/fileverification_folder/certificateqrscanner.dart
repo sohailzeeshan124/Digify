@@ -16,6 +16,7 @@ class _CertificateQRScannerScreenState
   String? scannedData;
   MobileScannerController controller = MobileScannerController();
   final CertificateViewModel _certificateViewModel = CertificateViewModel();
+  bool _isProcessing = false;
 
   @override
   void dispose() {
@@ -42,12 +43,25 @@ class _CertificateQRScannerScreenState
         context: context,
         builder: (context) => AlertDialog(
           title: const Text('Error'),
-          content: Text(
-              _certificateViewModel.errorMessage ?? 'Unknown error occurred'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(_certificateViewModel.errorMessage ??
+                  'Unknown error occurred'),
+              const SizedBox(height: 16),
+              const Text('Scanned Data:',
+                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
+              Text('"$data"',
+                  style: const TextStyle(
+                      fontFamily: 'Courier', fontSize: 12, color: Colors.blue)),
+            ],
+          ),
           actions: [
             TextButton(
               onPressed: () {
                 Navigator.of(context).pop();
+                _isProcessing = false;
                 controller.start();
               },
               child: const Text('Scan Again'),
@@ -205,6 +219,7 @@ class _CertificateQRScannerScreenState
                   TextButton(
                     onPressed: () {
                       Navigator.of(context).pop();
+                      _isProcessing = false;
                       controller.start();
                     },
                     child: const Text('Scan Again'),
@@ -257,11 +272,22 @@ class _CertificateQRScannerScreenState
             child: MobileScanner(
               controller: controller,
               onDetect: (capture) {
+                if (_isProcessing) return;
+
                 final List<Barcode> barcodes = capture.barcodes;
                 for (final barcode in barcodes) {
                   if (barcode.rawValue != null) {
-                    _showResultDialog(barcode.rawValue!);
-                    break;
+                    final code = barcode.rawValue!.trim();
+                    debugPrint("DEBUG: Scanned QR Raw: '${barcode.rawValue}'");
+                    debugPrint("DEBUG: Scanned QR Trimmed: '$code'");
+
+                    if (code.isNotEmpty) {
+                      setState(() {
+                        _isProcessing = true;
+                      });
+                      _showResultDialog(code);
+                      break;
+                    }
                   }
                 }
               },

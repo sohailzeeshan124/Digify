@@ -3,6 +3,7 @@ import 'package:digify/mainpage_folder/notification%20page/notifications_page.da
 import 'package:digify/mainpage_folder/setting%20pages/account%20folder/account_page.dart';
 import 'package:digify/mainpage_folder/setting%20pages/account%20folder/analytics_page.dart';
 import 'package:digify/mainpage_folder/setting%20pages/account%20folder/devices_connected_page.dart';
+import 'package:digify/mainpage_folder/setting%20pages/account%20folder/request_page.dart';
 import 'package:digify/mainpage_folder/setting%20pages/data%20&%20privacy/data&privacy.dart';
 import 'package:digify/mainpage_folder/setting%20pages/document%20setting/stampsetting.dart';
 import 'package:digify/mainpage_folder/setting%20pages/suport_settings/acknowledgement.dart';
@@ -136,6 +137,13 @@ class SettingsPage extends StatelessWidget {
                 icon: Icons.notifications, label: 'Notification', onTap: () {
               Navigator.of(context).push(
                 MaterialPageRoute(builder: (_) => const NotificationsPage()),
+              );
+            }),
+            _buildOptionRow(context,
+                icon: Icons.track_changes,
+                label: 'Request Tracking', onTap: () {
+              Navigator.of(context).push(
+                MaterialPageRoute(builder: (_) => const RequestPage()),
               );
             }),
           ]),

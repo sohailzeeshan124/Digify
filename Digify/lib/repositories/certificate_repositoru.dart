@@ -16,16 +16,20 @@ class CertificateRepository {
 
   Future<Result<CertificateModel>> getCertificate(String uid) async {
     try {
+      print("DEBUG: Repository querying Firestore for ID: '$uid'");
       final docRef = _firestore.collection('certificates').doc(uid);
       final snapshot = await docRef.get();
 
       if (snapshot.exists) {
+        print("DEBUG: Document found for ID: '$uid'. Data: ${snapshot.data()}");
         final document = CertificateModel.fromMap(snapshot.data()!);
         return Result.success(document);
       } else {
+        print("DEBUG: Document NOT found for ID: '$uid'");
         return Result.failure("Certificate not found");
       }
     } catch (e) {
+      print("DEBUG: Error fetching certificate: $e");
       return Result.failure("Error fetching certificate: ${e.toString()}");
     }
   }

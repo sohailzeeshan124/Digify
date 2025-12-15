@@ -76,22 +76,22 @@ class CertificateTypeScreen extends StatelessWidget {
                 );
               },
             ),
-            _buildCategoryCard(
-              icon: Icons.school,
-              title: 'Education',
-              subtitle: 'Educational certificate',
-              onTap: () {
-                // Navigate to Education certificate flow
-              },
-            ),
-            _buildCategoryCard(
-              icon: Icons.business,
-              title: 'Organization',
-              subtitle: 'Organizational certificate',
-              onTap: () {
-                // Navigate to Organization certificate flow
-              },
-            ),
+            // _buildCategoryCard(
+            //   icon: Icons.school,
+            //   title: 'Education',
+            //   subtitle: 'Educational certificate',
+            //   onTap: () {
+            //     // Navigate to Education certificate flow
+            //   },
+            // ),
+            // _buildCategoryCard(
+            //   icon: Icons.business,
+            //   title: 'Organization',
+            //   subtitle: 'Organizational certificate',
+            //   onTap: () {
+            //     // Navigate to Organization certificate flow
+            //   },
+            // ),
           ],
         ),
       ),

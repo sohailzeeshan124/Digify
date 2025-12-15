@@ -44,4 +44,26 @@ class CommunityModel {
       memberRoles: Map<String, String>.from(map['memberRoles'] ?? {}),
     );
   }
+
+  CommunityModel copyWith({
+    String? uid,
+    String? name,
+    String? description,
+    String? communityPicture,
+    List<String>? admins,
+    DateTime? createdAt,
+    List<String>? roles,
+    Map<String, String>? memberRoles,
+  }) {
+    return CommunityModel(
+      uid: uid ?? this.uid,
+      name: name ?? this.name,
+      description: description ?? this.description,
+      communityPicture: communityPicture ?? this.communityPicture,
+      admins: admins ?? this.admins,
+      createdAt: createdAt ?? this.createdAt,
+      roles: roles ?? this.roles,
+      memberRoles: memberRoles ?? this.memberRoles,
+    );
+  }
 }

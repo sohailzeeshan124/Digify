@@ -1,3 +1,5 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
+
 class ChannelModel {
   final String uid;
   final String communityId;
@@ -14,6 +16,24 @@ class ChannelModel {
     required this.canTalk,
     required this.createdat,
   });
+
+  ChannelModel copyWith({
+    String? uid,
+    String? communityId,
+    String? name,
+    List<String>? users,
+    bool? canTalk,
+    DateTime? createdat,
+  }) {
+    return ChannelModel(
+      uid: uid ?? this.uid,
+      communityId: communityId ?? this.communityId,
+      name: name ?? this.name,
+      users: users ?? this.users,
+      canTalk: canTalk ?? this.canTalk,
+      createdat: createdat ?? this.createdat,
+    );
+  }
 
   Map<String, dynamic> toMap() {
     return {
@@ -33,7 +53,9 @@ class ChannelModel {
       name: map['name'] ?? '',
       users: List<String>.from(map['users'] ?? []),
       canTalk: map['canTalk'] ?? false,
-      createdat: DateTime.parse(map['createdat']),
+      createdat: map['createdat'] is Timestamp
+          ? (map['createdat'] as Timestamp).toDate()
+          : DateTime.parse(map['createdat'].toString()),
     );
   }
 }

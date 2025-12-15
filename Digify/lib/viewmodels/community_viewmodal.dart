@@ -1,6 +1,9 @@
 import 'package:flutter/foundation.dart';
 import 'package:digify/modal_classes/community.dart';
 import 'package:digify/repositories/community_repository.dart';
+import 'package:digify/repositories/channel_repository.dart';
+import 'package:digify/modal_classes/channels.dart';
+import 'package:uuid/uuid.dart';
 
 class CommunityViewModel extends ChangeNotifier {
   final CommunityRepository _repository = CommunityRepository();
@@ -102,6 +105,7 @@ class CommunityViewModel extends ChangeNotifier {
   // Assign a role to a user
   Future<bool> assignRole(
       String communityId, String userId, String role) async {
+    print("VM: assignRole called");
     _setLoading(true);
     _setError(null);
 
@@ -110,10 +114,12 @@ class CommunityViewModel extends ChangeNotifier {
     _setLoading(false);
 
     if (result.error != null) {
+      print("VM: assignRole failed: ${result.error}");
       _setError(result.error);
       return false;
     }
     // Ideally we re-fetch community here to update state
+    print("VM: assignRole success, fetching community...");
     await fetchCommunity(communityId);
     return true;
   }
@@ -167,5 +173,70 @@ class CommunityViewModel extends ChangeNotifier {
     }
     await fetchCommunity(communityId);
     return true;
+  }
+
+  // Create a new role and associated channel
+  Future<bool> createRoleAndChannel(
+      String communityId, String roleName, String firstUserId) async {
+    _setLoading(true);
+    _setError(null);
+
+    try {
+      // 1. Add Role to Community
+      final roleResult = await _repository.addRole(communityId, roleName);
+      if (roleResult.error != null) {
+        _setError(roleResult.error);
+        _setLoading(false);
+        return false;
+      }
+
+      // 2. Create Channel for the Role
+      final ChannelRepository channelRepo = ChannelRepository();
+      final String channelId = const Uuid().v1();
+      final newChannel = ChannelModel(
+        uid: channelId,
+        communityId: communityId,
+        name: roleName, // Channel name same as role
+        users: [
+          firstUserId
+        ], // Add the user to the channel immediately (as requested)
+        canTalk: true, // Defaulting to true
+        createdat: DateTime.now(),
+      );
+
+      final channelResult = await channelRepo.createChannel(newChannel);
+      if (channelResult.error != null) {
+        // If channel creation fails, we might want to revert the role addition?
+        // For now, let's just error out.
+        _setError(
+            "Role created but channel creation failed: ${channelResult.error}");
+        _setLoading(false);
+        return false;
+      }
+
+      // 3. Assign Role to User
+      final assignResult =
+          await _repository.assignRole(communityId, firstUserId, roleName);
+      if (assignResult.error != null) {
+        _setError(
+            "Role & Channel created but assignment failed: ${assignResult.error}");
+        _setLoading(false);
+        return false;
+      }
+
+      // 4. Update the admins list if needed?
+      // The requirement doesn't explicitly say "Make them admin", just assign the role.
+      // But if the role implies specific permissions, that's separate.
+      // We'll stick to just assigning the text role.
+
+      // Success
+      await fetchCommunity(communityId); // Refresh local state
+      _setLoading(false);
+      return true;
+    } catch (e) {
+      _setError("Unexpected error: $e");
+      _setLoading(false);
+      return false;
+    }
   }
 }

@@ -45,6 +45,23 @@ class ChannelMessageRepository {
     }
   }
 
+  Future<Result<void>> deleteMessagesByChannel(String channelId) async {
+    try {
+      final batch = _firestore.batch();
+      final snapshots = await _firestore
+          .collection('channel_messages')
+          .where('channelId', isEqualTo: channelId)
+          .get();
+      for (var doc in snapshots.docs) {
+        batch.delete(doc.reference);
+      }
+      await batch.commit();
+      return Result.success(null);
+    } catch (e) {
+      return Result.failure("Error deleting messages: ${e.toString()}");
+    }
+  }
+
   Future<Result<List<ChannelMessageModel>>> getMessages(
       String channelid) async {
     try {

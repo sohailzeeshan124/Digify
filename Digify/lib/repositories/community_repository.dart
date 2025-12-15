@@ -66,11 +66,15 @@ class CommunityRepository {
   Future<Result<void>> assignRole(
       String communityId, String userId, String role) async {
     try {
+      print(
+          "REPO: Assigning role '$role' to user '$userId' in community '$communityId'");
       await _firestore.collection('communities').doc(communityId).update({
         'memberRoles.$userId': role,
       });
+      print("REPO: Role assigned successfully");
       return Result.success(null);
     } catch (e) {
+      print("REPO: Error assigning role: $e");
       return Result.failure("Error assigning role: ${e.toString()}");
     }
   }
@@ -109,6 +113,18 @@ class CommunityRepository {
       return Result.success(null);
     } catch (e) {
       return Result.failure("Error removing admin: ${e.toString()}");
+    }
+  }
+
+  // Add a new role to the community
+  Future<Result<void>> addRole(String communityId, String roleName) async {
+    try {
+      await _firestore.collection('communities').doc(communityId).update({
+        'roles': FieldValue.arrayUnion([roleName]),
+      });
+      return Result.success(null);
+    } catch (e) {
+      return Result.failure("Error adding role: ${e.toString()}");
     }
   }
 }

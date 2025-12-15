@@ -96,9 +96,43 @@ class UserRepository {
     });
   }
 
-  Future<void> addServerJoined(String userId, String communityId) async {
-    await _firestore.collection(collection).doc(userId).update({
-      'serverjoined': FieldValue.arrayUnion([communityId])
+  Future<void> removeFriend(String currentUserId, String friendId) async {
+    // Remove friend from current user's friend list
+    await _firestore.collection(collection).doc(currentUserId).update({
+      'friends': FieldValue.arrayRemove([friendId])
     });
+
+    // Remove current user from friend's friend list
+    await _firestore.collection(collection).doc(friendId).update({
+      'friends': FieldValue.arrayRemove([currentUserId])
+    });
+  }
+
+  Future<void> addServerJoined(String userId, String communityId) async {
+    print(
+        "REPO: Adding community '$communityId' to user '$userId' serversJoined");
+    try {
+      await _firestore.collection(collection).doc(userId).update({
+        'serversJoined': FieldValue.arrayUnion([communityId])
+      });
+      print("REPO: Added to serversJoined successfully");
+    } catch (e) {
+      print("REPO: Error adding to serversJoined: $e");
+      rethrow;
+    }
+  }
+
+  Future<void> removeServerJoined(String userId, String communityId) async {
+    print(
+        "REPO: Removing community '$communityId' from user '$userId' serversJoined");
+    try {
+      await _firestore.collection(collection).doc(userId).update({
+        'serversJoined': FieldValue.arrayRemove([communityId])
+      });
+      print("REPO: Removed from serversJoined successfully");
+    } catch (e) {
+      print("REPO: Error removing from serversJoined: $e");
+      rethrow;
+    }
   }
 }

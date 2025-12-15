@@ -15,39 +15,56 @@ import 'package:geolocator/geolocator.dart';
 import 'package:digify/viewmodels/user_viewmodel.dart';
 import 'package:uuid/uuid.dart';
 
-class WorkingPhotocertificate extends StatefulWidget {
-  const WorkingPhotocertificate({super.key});
+class WorkingPurchaseCertificate extends StatefulWidget {
+  const WorkingPurchaseCertificate({super.key});
 
   @override
-  State<WorkingPhotocertificate> createState() =>
-      _WorkingPhotocertificateState();
+  State<WorkingPurchaseCertificate> createState() =>
+      _WorkingPurchaseCertificateState();
 }
 
-class _WorkingPhotocertificateState extends State<WorkingPhotocertificate> {
+class _WorkingPurchaseCertificateState
+    extends State<WorkingPurchaseCertificate> {
   final PageController _pageController = PageController();
   int _currentStep = 0;
   final int _totalSteps = 3;
 
-  // Section 1 Data
-  final List<XFile> _selectedImages = [];
+  // Section 1: Images
+  XFile? _itemImage;
+  XFile? _receiptImage;
   final ImagePicker _picker = ImagePicker();
 
-  // Section 2 Data
-  final TextEditingController _notesController = TextEditingController();
-  final TextEditingController _infoController = TextEditingController();
+  // Section 2: Details
+  final TextEditingController _itemNameController = TextEditingController();
+  final TextEditingController _itemPriceController = TextEditingController();
+  final TextEditingController _itemQuantityController = TextEditingController();
+  final TextEditingController _shopNameController = TextEditingController();
+  final TextEditingController _shopLocationController = TextEditingController();
 
-  // Section 3 Data
-  final TextEditingController _titleController = TextEditingController();
-  final TextEditingController _nameController = TextEditingController();
+  // Section 3: Finalize
+  final TextEditingController _testimonyController = TextEditingController();
+  final TextEditingController _buyerNameController = TextEditingController();
   bool _addLocation = false;
+
+  @override
+  void initState() {
+    super.initState();
+    final user = FirebaseAuth.instance.currentUser;
+    if (user != null) {
+      _buyerNameController.text = user.displayName ?? '';
+    }
+  }
 
   @override
   void dispose() {
     _pageController.dispose();
-    _notesController.dispose();
-    _infoController.dispose();
-    _titleController.dispose();
-    _nameController.dispose();
+    _itemNameController.dispose();
+    _itemPriceController.dispose();
+    _itemQuantityController.dispose();
+    _shopNameController.dispose();
+    _shopLocationController.dispose();
+    _testimonyController.dispose();
+    _buyerNameController.dispose();
     super.dispose();
   }
 
@@ -85,17 +102,13 @@ class _WorkingPhotocertificateState extends State<WorkingPhotocertificate> {
     );
 
     try {
-      print('Starting report generation...');
       final user = FirebaseAuth.instance.currentUser;
       if (user == null) {
         throw Exception('User not logged in');
       }
 
       // 1. Gather Data
-      print('Fetching device data...');
       final deviceData = await _fetchDeviceData();
-
-      print('Fetching location data...');
       final locationData = _addLocation ? await _fetchLocationData() : null;
 
       final userData = {
@@ -104,31 +117,31 @@ class _WorkingPhotocertificateState extends State<WorkingPhotocertificate> {
         'uid': user.uid,
       };
 
-      // Generate a unique ID for the certificate.
       final certDocId = const Uuid().v4();
-      print("DEBUG: Generated Certificate ID: '$certDocId'");
-
-      // Fetch App Name
       final packageInfo = await PackageInfo.fromPlatform();
       final appName = packageInfo.appName;
 
-      // Fetch Signature Path
       String? signaturePath;
       try {
         final userViewModel = UserViewModel();
         final userDataModel = await userViewModel.getUser(user.uid);
         signaturePath = userDataModel?.signatureLocalPath;
       } catch (e) {
-        print('Error fetching signature path: $e');
+        print('Error fetching signature: $e');
       }
 
       // 2. Generate PDF
-      print('Generating PDF...');
-      final pdfBytes = await PdfGeneratorService().generateReport(
-        title: _titleController.text,
-        images: _selectedImages.map((x) => File(x.path)).toList(),
-        additionalNotes: _notesController.text,
-        importantInfo: _infoController.text,
+      // Implement generatePurchaseReport in PdfGeneratorService
+      final pdfBytes = await PdfGeneratorService().generatePurchaseReport(
+        itemName: _itemNameController.text,
+        itemPrice: _itemPriceController.text,
+        itemQuantity: _itemQuantityController.text,
+        shopName: _shopNameController.text,
+        shopLocation: _shopLocationController.text,
+        testimony: _testimonyController.text,
+        buyerName: _buyerNameController.text,
+        itemImage: _itemImage != null ? File(_itemImage!.path) : null,
+        receiptImage: _receiptImage != null ? File(_receiptImage!.path) : null,
         userData: userData,
         deviceData: deviceData,
         locationData: locationData,
@@ -137,13 +150,11 @@ class _WorkingPhotocertificateState extends State<WorkingPhotocertificate> {
         appName: appName,
       );
 
-      // 3. Upload PDF to Cloudinary
-      print('Uploading to Cloudinary...');
+      // 3. Upload & Save
       final tempDir = await Directory.systemTemp.createTemp();
       final tempFile = File('${tempDir.path}/certificate_$certDocId.pdf');
       await tempFile.writeAsBytes(pdfBytes);
 
-      // Save locally
       final localDir =
           Directory('/storage/emulated/0/Documents/generated_certificate');
       if (!await localDir.exists()) {
@@ -157,21 +168,20 @@ class _WorkingPhotocertificateState extends State<WorkingPhotocertificate> {
           folder: 'digify/certificates');
 
       if (response == null || response.secureUrl == null) {
-        throw Exception('Failed to upload PDF to Cloudinary');
+        throw Exception('Failed to upload PDF');
       }
-      print('Upload successful: ${response.secureUrl}');
 
       // 4. Create Certificate Model
       final certificate = CertificateModel(
         docId: certDocId,
-        Name: _titleController.text,
+        Name: "Purchase: ${_itemNameController.text}",
         uploadedBy: user.displayName ?? 'Unknown',
         createdAt: DateTime.now(),
         pdfUrl: response.secureUrl!,
         localpdfpath: localFile.path,
         signedBy: [
           SignerInfo(
-            Name: _nameController.text,
+            Name: _buyerNameController.text,
             uid: user.uid,
             signedAt: DateTime.now(),
           )
@@ -179,7 +189,6 @@ class _WorkingPhotocertificateState extends State<WorkingPhotocertificate> {
       );
 
       // 5. Save to Firestore
-      print('Saving to Firestore...');
       final viewModel = CertificateViewModel();
       await viewModel.finalizeSignature(certificate);
 
@@ -187,31 +196,19 @@ class _WorkingPhotocertificateState extends State<WorkingPhotocertificate> {
         throw Exception(viewModel.errorMessage);
       }
 
-      // Close loading dialog
       if (mounted) {
-        Navigator.of(context).pop();
-      }
-
-      if (mounted) {
+        Navigator.pop(context); // Close loading
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Text('Report Generated and Saved Successfully!'),
             backgroundColor: Colors.green,
           ),
         );
-        // Navigate back or show success dialog
-        Navigator.pop(context);
+        Navigator.pop(context); // Close screen
       }
-    } catch (e, stackTrace) {
-      print('Error generating report: $e');
-      print(stackTrace);
-
-      // Close loading dialog if open
+    } catch (e) {
       if (mounted) {
-        Navigator.of(context).pop();
-      }
-
-      if (mounted) {
+        Navigator.pop(context); // Close loading
         showDialog(
           context: context,
           builder: (context) => AlertDialog(
@@ -219,9 +216,8 @@ class _WorkingPhotocertificateState extends State<WorkingPhotocertificate> {
             content: Text('Failed to generate report: $e'),
             actions: [
               TextButton(
-                onPressed: () => Navigator.pop(context),
-                child: const Text('OK'),
-              ),
+                  onPressed: () => Navigator.pop(context),
+                  child: const Text('OK'))
             ],
           ),
         );
@@ -237,75 +233,31 @@ class _WorkingPhotocertificateState extends State<WorkingPhotocertificate> {
       'version': packageInfo.version,
     };
 
-    try {
-      if (Platform.isAndroid) {
-        final androidInfo = await deviceInfoPlugin.androidInfo;
-        deviceData['model'] = '${androidInfo.brand} ${androidInfo.model}';
-        deviceData['os'] = 'Android';
-        deviceData['osVersion'] = androidInfo.version.release;
-      } else if (Platform.isIOS) {
-        final iosInfo = await deviceInfoPlugin.iosInfo;
-        deviceData['model'] = '${iosInfo.name} ${iosInfo.model}';
-        deviceData['os'] = 'iOS';
-        deviceData['osVersion'] = iosInfo.systemVersion;
-      } else {
-        deviceData['model'] = 'Unknown';
-        deviceData['os'] = Platform.operatingSystem;
-        deviceData['osVersion'] = Platform.operatingSystemVersion;
-      }
-
-      // IP Address - Add timeout to prevent hanging
-      try {
-        await Future.any([
-          _getIpAddress(deviceData),
-          Future.delayed(const Duration(seconds: 2)),
-        ]);
-      } catch (e) {
-        print('Timeout or error fetching IP: $e');
-        deviceData['ip'] = 'Unknown';
-      }
-    } catch (e) {
-      print('Error fetching device info: $e');
+    if (Platform.isAndroid) {
+      final androidInfo = await deviceInfoPlugin.androidInfo;
+      deviceData['model'] = '${androidInfo.brand} ${androidInfo.model}';
+      deviceData['os'] = 'Android';
+      deviceData['osVersion'] = androidInfo.version.release;
+    } else if (Platform.isIOS) {
+      final iosInfo = await deviceInfoPlugin.iosInfo;
+      deviceData['model'] = '${iosInfo.name} ${iosInfo.model}';
+      deviceData['os'] = 'iOS';
+      deviceData['osVersion'] = iosInfo.systemVersion;
     }
     return deviceData;
   }
 
-  Future<void> _getIpAddress(Map<String, String> deviceData) async {
-    try {
-      for (var interface in await NetworkInterface.list()) {
-        for (var addr in interface.addresses) {
-          if (addr.type == InternetAddressType.IPv4 && !addr.isLoopback) {
-            deviceData['ip'] = addr.address;
-            return;
-          }
-        }
-      }
-    } catch (e) {
-      print('Error getting IP: $e');
-    }
-  }
-
   Future<Map<String, dynamic>?> _fetchLocationData() async {
     try {
-      bool serviceEnabled;
-      LocationPermission permission;
+      bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
+      if (!serviceEnabled) return null;
 
-      serviceEnabled = await Geolocator.isLocationServiceEnabled();
-      if (!serviceEnabled) {
-        return null;
-      }
-
-      permission = await Geolocator.checkPermission();
+      LocationPermission permission = await Geolocator.checkPermission();
       if (permission == LocationPermission.denied) {
         permission = await Geolocator.requestPermission();
-        if (permission == LocationPermission.denied) {
-          return null;
-        }
+        if (permission == LocationPermission.denied) return null;
       }
-
-      if (permission == LocationPermission.deniedForever) {
-        return null;
-      }
+      if (permission == LocationPermission.deniedForever) return null;
 
       final position = await Geolocator.getCurrentPosition();
       return {
@@ -313,7 +265,6 @@ class _WorkingPhotocertificateState extends State<WorkingPhotocertificate> {
         'longitude': position.longitude,
       };
     } catch (e) {
-      print('Error fetching location: $e');
       return null;
     }
   }
@@ -332,24 +283,30 @@ class _WorkingPhotocertificateState extends State<WorkingPhotocertificate> {
 
   bool _validateCurrentStep() {
     if (_currentStep == 0) {
-      if (_selectedImages.isEmpty) {
+      if (_itemImage == null || _receiptImage == null) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Please select at least one image.')),
+          const SnackBar(
+              content: Text('Please upload both item and receipt images.')),
         );
         return false;
       }
     } else if (_currentStep == 1) {
-      if (_notesController.text.trim().isEmpty) {
+      if (_itemNameController.text.isEmpty ||
+          _itemPriceController.text.isEmpty ||
+          _itemQuantityController.text.isEmpty ||
+          _shopNameController.text.isEmpty ||
+          _shopLocationController.text.isEmpty) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Please enter additional notes.')),
+          const SnackBar(content: Text('Please fill in all details.')),
         );
         return false;
       }
     } else if (_currentStep == 2) {
-      if (_titleController.text.trim().isEmpty ||
-          _nameController.text.trim().isEmpty) {
+      if (_buyerNameController.text.isEmpty ||
+          _testimonyController.text.isEmpty) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Please fill in all fields.')),
+          const SnackBar(
+              content: Text('Please complete the testimony and signature.')),
         );
         return false;
       }
@@ -357,12 +314,16 @@ class _WorkingPhotocertificateState extends State<WorkingPhotocertificate> {
     return true;
   }
 
-  Future<void> _pickImage(ImageSource source) async {
+  Future<void> _pickImage(ImageSource source, bool isItem) async {
     try {
       final XFile? image = await _picker.pickImage(source: source);
       if (image != null) {
         setState(() {
-          _selectedImages.add(image);
+          if (isItem) {
+            _itemImage = image;
+          } else {
+            _receiptImage = image;
+          }
         });
       }
     } catch (e) {
@@ -375,11 +336,11 @@ class _WorkingPhotocertificateState extends State<WorkingPhotocertificate> {
   String _getSectionTitle() {
     switch (_currentStep) {
       case 0:
-        return 'Select Images';
+        return 'Upload Images';
       case 1:
-        return 'Additional Information';
+        return 'Purchase Details';
       case 2:
-        return 'Finalize Certificate';
+        return 'Finalize & Testimony';
       default:
         return '';
     }
@@ -389,7 +350,7 @@ class _WorkingPhotocertificateState extends State<WorkingPhotocertificate> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Create Photo Certificate'),
+        title: const Text('New Purchase Certificate'),
         backgroundColor: AppColors.primaryGreen,
         iconTheme: const IconThemeData(color: Colors.white),
         titleTextStyle: const TextStyle(
@@ -403,7 +364,7 @@ class _WorkingPhotocertificateState extends State<WorkingPhotocertificate> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 const Text(
-                  'Acquire and degify photos in real time',
+                  'Record purchase details and receipt',
                   style: TextStyle(
                     fontSize: 18,
                     fontWeight: FontWeight.bold,
@@ -411,51 +372,6 @@ class _WorkingPhotocertificateState extends State<WorkingPhotocertificate> {
                   ),
                 ),
                 const SizedBox(height: 16),
-                // Hero Section Icons
-                Container(
-                  width: double.infinity,
-                  padding:
-                      const EdgeInsets.symmetric(vertical: 20, horizontal: 20),
-                  decoration: BoxDecoration(
-                    color: AppColors.primaryGreen,
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceAround,
-                    children: [
-                      Icon(Icons.mail_outline,
-                          color: Colors.white.withOpacity(0.5)),
-                      Icon(Icons.graphic_eq,
-                          color: Colors.white.withOpacity(0.5)),
-                      Icon(Icons.play_arrow,
-                          color: Colors.white.withOpacity(0.5)),
-                      Container(
-                        padding: const EdgeInsets.all(8),
-                        decoration: BoxDecoration(
-                          border: Border.all(color: Colors.white, width: 2),
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                        child: const Icon(Icons.camera_alt,
-                            color: Colors.white, size: 30),
-                      ),
-                      Icon(Icons.folder_open,
-                          color: Colors.white.withOpacity(0.5)),
-                      Icon(Icons.qr_code_scanner,
-                          color: Colors.white.withOpacity(0.5)),
-                      Icon(Icons.location_on_outlined,
-                          color: Colors.white.withOpacity(0.5)),
-                    ],
-                  ),
-                ),
-                const SizedBox(height: 20),
-                Text(
-                  _getSectionTitle(),
-                  style: const TextStyle(
-                    fontSize: 20,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-                const SizedBox(height: 10),
                 // Progress Bar
                 Row(
                   children: List.generate(_totalSteps, (index) {
@@ -468,13 +384,17 @@ class _WorkingPhotocertificateState extends State<WorkingPhotocertificate> {
                               ? AppColors.primaryGreen
                               : Colors.grey.shade300,
                           borderRadius: BorderRadius.circular(6),
-                          border: Border.all(
-                              color: Colors.black87,
-                              width: 2), // thicker border
+                          border: Border.all(color: Colors.black87, width: 2),
                         ),
                       ),
                     );
                   }),
+                ),
+                const SizedBox(height: 10),
+                Text(
+                  _getSectionTitle(),
+                  style: const TextStyle(
+                      fontSize: 20, fontWeight: FontWeight.bold),
                 ),
               ],
             ),
@@ -498,97 +418,137 @@ class _WorkingPhotocertificateState extends State<WorkingPhotocertificate> {
 
   Widget _buildSection1() {
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16.0),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Text('Choose images from gallery or take a new photo.'),
-          const SizedBox(height: 20),
-          Row(
-            children: [
-              Expanded(
-                child: _buildUploadButton(
-                  onPressed: () => _pickImage(ImageSource.camera),
-                  text: 'Camera',
-                  icon: Icons.camera_alt,
-                ),
-              ),
-              const SizedBox(width: 10),
-              Expanded(
-                child: _buildUploadButton(
-                  onPressed: () => _pickImage(ImageSource.gallery),
-                  text: 'Gallery',
-                  icon: Icons.photo_library,
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 20),
-          Expanded(
-            child: _selectedImages.isEmpty
-                ? const Center(child: Text('No images selected'))
-                : GridView.builder(
-                    gridDelegate:
-                        const SliverGridDelegateWithFixedCrossAxisCount(
-                      crossAxisCount: 3,
-                      crossAxisSpacing: 8,
-                      mainAxisSpacing: 8,
-                    ),
-                    itemCount: _selectedImages.length,
-                    itemBuilder: (context, index) {
-                      return Stack(
-                        children: [
-                          Image.file(
-                            File(_selectedImages[index].path),
-                            fit: BoxFit.cover,
-                            width: double.infinity,
-                            height: double.infinity,
-                          ),
-                          Positioned(
-                            top: 0,
-                            right: 0,
-                            child: IconButton(
-                              icon: const Icon(Icons.remove_circle,
-                                  color: Colors.red),
-                              onPressed: () {
-                                setState(() {
-                                  _selectedImages.removeAt(index);
-                                });
-                              },
-                            ),
-                          ),
-                        ],
-                      );
-                    },
-                  ),
-          ),
-        ],
+      padding: const EdgeInsets.all(16.0),
+      child: SingleChildScrollView(
+        child: Column(
+          children: [
+            _buildImagePickerRow('Item Image', _itemImage, true),
+            const SizedBox(height: 20),
+            _buildImagePickerRow('Receipt Image', _receiptImage, false),
+          ],
+        ),
       ),
+    );
+  }
+
+  Widget _buildImagePickerRow(String label, XFile? imageFile, bool isItem) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(label, style: const TextStyle(fontWeight: FontWeight.bold)),
+        const SizedBox(height: 10),
+        if (imageFile != null)
+          Container(
+            height: 200,
+            width: double.infinity,
+            decoration: BoxDecoration(
+              border: Border.all(color: Colors.grey),
+              borderRadius: BorderRadius.circular(8),
+              image: DecorationImage(
+                image: FileImage(File(imageFile.path)),
+                fit: BoxFit.cover,
+              ),
+            ),
+          )
+        else
+          Container(
+            height: 150,
+            width: double.infinity,
+            decoration: BoxDecoration(
+              color: Colors.grey.shade200,
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(color: Colors.grey),
+            ),
+            child: const Center(
+              child: Icon(Icons.image, size: 50, color: Colors.grey),
+            ),
+          ),
+        const SizedBox(height: 10),
+        Row(
+          children: [
+            Expanded(
+              child: ElevatedButton.icon(
+                onPressed: () => _pickImage(ImageSource.camera, isItem),
+                icon: const Icon(Icons.camera_alt),
+                label: const Text('Camera'),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppColors.primaryGreen,
+                  foregroundColor: Colors.white,
+                ),
+              ),
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: ElevatedButton.icon(
+                onPressed: () => _pickImage(ImageSource.gallery, isItem),
+                icon: const Icon(Icons.photo_library),
+                label: const Text('Gallery'),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.white,
+                  foregroundColor: AppColors.primaryGreen,
+                  side: const BorderSide(color: AppColors.primaryGreen),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ],
     );
   }
 
   Widget _buildSection2() {
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16.0),
+      padding: const EdgeInsets.all(16.0),
       child: SingleChildScrollView(
         child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const SizedBox(height: 20),
             TextField(
-              controller: _notesController,
+              controller: _itemNameController,
               decoration: const InputDecoration(
-                labelText: 'Additional Notes',
+                labelText: 'Item Name',
                 border: OutlineInputBorder(),
-                alignLabelWithHint: true,
               ),
-              maxLines: 5,
             ),
-            const SizedBox(height: 20),
+            const SizedBox(height: 15),
+            Row(
+              children: [
+                Expanded(
+                  child: TextField(
+                    controller: _itemPriceController,
+                    keyboardType: TextInputType.number,
+                    decoration: const InputDecoration(
+                      labelText: 'Price',
+                      border: OutlineInputBorder(),
+                      prefixText: '\$ ',
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 15),
+                Expanded(
+                  child: TextField(
+                    controller: _itemQuantityController,
+                    keyboardType: TextInputType.number,
+                    decoration: const InputDecoration(
+                      labelText: 'Quantity',
+                      border: OutlineInputBorder(),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 15),
             TextField(
-              controller: _infoController,
+              controller: _shopNameController,
               decoration: const InputDecoration(
-                labelText: 'Important Information',
+                labelText: 'Shop Name',
+                border: OutlineInputBorder(),
+              ),
+            ),
+            const SizedBox(height: 15),
+            TextField(
+              controller: _shopLocationController,
+              decoration: const InputDecoration(
+                labelText: 'Shop Location (Address)',
                 border: OutlineInputBorder(),
               ),
             ),
@@ -600,22 +560,28 @@ class _WorkingPhotocertificateState extends State<WorkingPhotocertificate> {
 
   Widget _buildSection3() {
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16.0),
+      padding: const EdgeInsets.all(16.0),
       child: SingleChildScrollView(
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const SizedBox(height: 20),
+            const Text(
+              "Buyer's Testimony",
+              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+            ),
+            const SizedBox(height: 10),
             TextField(
-              controller: _titleController,
+              controller: _testimonyController,
               decoration: const InputDecoration(
-                labelText: 'Certification Title',
+                labelText: 'Testimony',
+                hintText: 'I hereby certify that I purchased this item...',
                 border: OutlineInputBorder(),
               ),
+              maxLines: 4,
             ),
             const SizedBox(height: 20),
             TextField(
-              controller: _nameController,
+              controller: _buyerNameController,
               decoration: const InputDecoration(
                 labelText: 'Your Name (Digital Signature)',
                 border: OutlineInputBorder(),
@@ -679,40 +645,6 @@ class _WorkingPhotocertificateState extends State<WorkingPhotocertificate> {
               ),
             ),
           ],
-        ],
-      ),
-    );
-  }
-
-  Widget _buildUploadButton({
-    required VoidCallback onPressed,
-    required String text,
-    required IconData icon,
-  }) {
-    return ElevatedButton(
-      onPressed: onPressed,
-      style: ElevatedButton.styleFrom(
-        backgroundColor: Colors.grey.shade100,
-        foregroundColor: AppColors.primaryGreen,
-        elevation: 0,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(10),
-          side: const BorderSide(color: AppColors.primaryGreen, width: 1),
-        ),
-        minimumSize: const Size(double.infinity, 50),
-      ),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Icon(icon),
-          const SizedBox(width: 10),
-          Text(
-            text,
-            style: GoogleFonts.poppins(
-              fontSize: 16,
-              fontWeight: FontWeight.w500,
-            ),
-          ),
         ],
       ),
     );

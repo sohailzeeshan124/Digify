@@ -221,6 +221,18 @@ class _CreateCommunityPageState extends State<CreateCommunityPage> {
       );
       await channelVM.createChannel(rulesChannel);
 
+      // 8. Create General Channel (Default)
+      final generalChannelId = const Uuid().v4();
+      final generalChannel = ChannelModel(
+        uid: generalChannelId,
+        communityId: communityId,
+        name: "general",
+        users: [user.uid],
+        canTalk: true,
+        createdat: DateTime.now(),
+      );
+      await channelVM.createChannel(generalChannel);
+
       // 6. Send Description to Intro Channel
       final messageVM = ChannelMessageViewModel();
       final introMessage = ChannelMessageModel(
